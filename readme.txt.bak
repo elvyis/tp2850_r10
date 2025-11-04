@@ -1,0 +1,66 @@
+2019.3.7
+	1. first release, match Vin&PTZ withe R30 EVK.
+2019.3.19
+	1. add 720P30HDR format support.
+2019.4.4
+	1. add 1280x800@29 format support.
+2019.4.8
+	1. add 1080p24/27.5 format support.
+2019.5.6
+	1. remove 8M12 to support 1280x800@29 auto detection
+2019.5.16
+	1. update reg0x0b=0x80 at WXGA mode
+2019.7.4
+	1. use xdata and change timer to avoid UART halt
+2019.11.5
+	1. update reg0x38 0x4c->0x4e at differential mode
+2019.12.17
+	1. update V2&V1 reg0x38=0x00
+2020.3.4
+	1. merge the TP2825B and TP2850 into one 
+2020.3.27
+	1. add 1280x320p60
+	2. update CVBS N/P detection
+	
+2020.11.30
+	1. add TP2860 support
+	2. correct half mode issue after QHD25/30 plug and unplug 
+	
+2021.01.30
+	1. add new AHD 720p/1080p/960p25 setting for TP2860 
+	2. add 720H CVBS for TP2860
+	3. add TVI 960p30 for TP2860(cannot support 1080p30 at same) 
+	
+2021.02.01
+	1. add TVI 960p25 for TP2860(cannot support 1080p25 at same) 	
+
+2021.02.05
+	1. use MD3 as 960P/1080P switching(short is 960P, open is 1080P at power on) 	
+
+2021.03.31
+	1. update CVBS crop as 960H for TP2825B/TP2850
+
+2021.05.24
+  1. update TP2825B UTC for AHD
+
+2021.06.04
+  1. Add UTC data reading out function
+ 
+2021.06.17
+  1. Add manual mode(MD1 is short) to select 720p25/30, 1080p25/30, TVI/AHD with SW901 
+  ON side=0
+  SW0 0->30fps 1->25fps
+  SW1 0->720p  1->1080p
+  SW2 0->AHD   1->TVI
+  
+2021.06.23
+  1. reduce code size to support TP3803C2, baudrate is 19200
+
+2021.08.03
+  1. clean some MDIN340 NR debug code
+  
+2021.08.24
+  1. add TVI 720P25HDR
+   
+      
+	 	

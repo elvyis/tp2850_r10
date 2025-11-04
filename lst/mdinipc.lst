@@ -1,0 +1,383 @@
+C51 COMPILER V9.60.7.0   MDINIPC                                                           12/22/2023 18:00:42 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MDINIPC
+OBJECT MODULE PLACED IN .\obj\mdinipc.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE src\MDIN3xx\mdinipc.c LARGE OPTIMIZE(9,SIZE) BROWSE DEBUG OBJECTEXTEND P
+                    -RINT(.\lst\mdinipc.lst) TABS(2) OBJECT(.\obj\mdinipc.obj)
+
+line level    source
+
+   1          //--------------------------------------------------------------------------------------------------------
+             ---------------
+   2          // (C) Copyright 2008  Macro Image Technology Co., LTd. , All rights reserved
+   3          // 
+   4          // This source code is the property of Macro Image Technology and is provided
+   5          // pursuant to a Software License Agreement. This code's reuse and distribution
+   6          // without Macro Image Technology's permission is strictly limited by the confidential
+   7          // information provisions of the Software License Agreement.
+   8          //--------------------------------------------------------------------------------------------------------
+             ----------------
+   9          //
+  10          // File Name      : MDINIPC.C
+  11          // Description    :
+  12          // Ref. Docment   : 
+  13          // Revision History   :
+  14          
+  15          // ----------------------------------------------------------------------
+  16          // Include files
+  17          // ----------------------------------------------------------------------
+  18          #include  <string.h>
+  19          #include  "mdin3xx.h"
+  20          
+  21          #if __MDIN3xx_DBGPRT__ == 1
+              #include  "..\inc\printf.h" // for printf
+              #endif
+  24          
+  25          // -----------------------------------------------------------------------------
+  26          // Struct/Union Types and define
+  27          // -----------------------------------------------------------------------------
+  28          static BYTE enInterWND = 0;
+  29          
+  30          // ----------------------------------------------------------------------
+  31          // Static Global Data section variables
+  32          // ----------------------------------------------------------------------
+  33          
+  34          // ----------------------------------------------------------------------
+  35          // External Variable 
+  36          // ----------------------------------------------------------------------
+  37          
+  38          // ----------------------------------------------------------------------
+  39          // Static Prototype Functions
+  40          // ----------------------------------------------------------------------
+  41          
+  42          // ----------------------------------------------------------------------
+  43          // Static functions
+  44          // ----------------------------------------------------------------------
+  45          
+  46          //--------------------------------------------------------------------------------------------------------
+             -------------------
+  47          MDIN_ERROR_t MDIN3xx_SetIPCBlock(void)
+  48          {
+  49   1        return MDINHIF_MultiWrite(MDIN_LOCAL_ID, 0x200, (PBYTE)MDIN_Deinter_Default, 256);
+  50   1      }
+  51          
+C51 COMPILER V9.60.7.0   MDINIPC                                                           12/22/2023 18:00:42 PAGE 2   
+
+  52          //--------------------------------------------------------------------------------------------------------
+             -------------------
+  53          MDIN_ERROR_t MDIN3xx_SetDeintMode(PMDIN_VIDEO_INFO pINFO, MDIN_DEINT_MODE_t mode)
+  54          {
+  55   1        PMDIN_DEINTCTL_INFO pIPC = (PMDIN_DEINTCTL_INFO)&pINFO->stIPC_m;
+  56   1      
+  57   1      //  pIPC->mode = (pIPC->attb&MDIN_DEINT_IPC_PROC)? mode : MDIN_DEINT_NONSTILL;
+  58   1        pIPC->mode = mode; if ((pIPC->attb&MDIN_DEINT_IPC_PROC)==0) mode = MDIN_DEINT_NONSTILL;
+  59   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x210, 12, 2, mode)) return MDIN_I2C_ERROR;
+  60   1        return MDIN_NO_ERROR;
+  61   1      }
+  62          
+  63          //--------------------------------------------------------------------------------------------------------
+             -------------------
+  64          MDIN_ERROR_t MDIN3xx_SetDeintFilm(PMDIN_VIDEO_INFO pINFO, MDIN_DEINT_FILM_t mode)
+  65          {
+  66   1        PMDIN_DEINTCTL_INFO pIPC = (PMDIN_DEINTCTL_INFO)&pINFO->stIPC_m;
+  67   1      
+  68   1      //  pIPC->film = (pIPC->attb&MDIN_DEINT_IPC_PROC)? mode : MDIN_DEINT_FILM_OFF;
+  69   1        pIPC->film = mode; if ((pIPC->attb&MDIN_DEINT_IPC_PROC)==0) mode = MDIN_DEINT_FILM_OFF;
+  70   1        if (pINFO->dacPATH==DAC_PATH_AUX_4CH) mode = MDIN_DEINT_FILM_OFF;
+  71   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x250, 12, 3, mode)) return MDIN_I2C_ERROR;
+  72   1        return MDIN_NO_ERROR;
+  73   1      }
+  74          
+  75          //--------------------------------------------------------------------------------------------------------
+             -------------------
+  76          static MDIN_ERROR_t MDIN3xx_ScaleDownProgNR(PMDIN_VIDEO_INFO pINFO, BOOL OnOff)
+  77          {
+  78   1        PMDIN_SRCVIDEO_INFO pSRC = (PMDIN_SRCVIDEO_INFO)&pINFO->stSRC_m;
+  79   1        PMDIN_DEINTCTL_INFO pIPC = (PMDIN_DEINTCTL_INFO)&pINFO->stIPC_m;
+  80   1        WORD nID = (pSRC->stATTB.attb&MDIN_USE_INPORT_A)? 1 : 0;
+  81   1      
+  82   1      
+  83   1        if (OnOff==0||(pIPC->attb&MDIN_DEINT_IPC_PROC)) return MDIN_NO_ERROR;
+  84   1        if ((pIPC->attb&MDIN_DEINT_DN_SCALE)==0) return MDIN_NO_ERROR;
+  85   1      
+  86   1        // because of getting field_id toggle
+  87   1        // nr_t_en, deinterlace_en
+  88   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x205, 0, 1, 1)) return MDIN_I2C_ERROR;
+  89   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x205, 4, 1, 1)) return MDIN_I2C_ERROR;
+  90   1      
+  91   1        // fieldid_bypass, progressive
+  92   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x001, 2+nID,   1, 1)) return MDIN_I2C_ERROR;
+  93   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x002, 8-nID*8, 1, 0)) return MDIN_I2C_ERROR;
+  94   1        
+  95   1        // out dark screen
+  96   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x43, 1, 1, 1)) return MDIN_I2C_ERROR;
+  97   1      
+  98   1        // in_test_ptrn
+  99   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x042, 0x0084)) return MDIN_I2C_ERROR;
+ 100   1      
+ 101   1        MDINDLY_mSec(100);    // delay 100ms
+ 102   1      
+ 103   1        // restore deinterlace_en, progressive, in_test_ptrn
+ 104   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x205, 4, 1, 0)) return MDIN_I2C_ERROR;
+ 105   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x002, 8-nID*8, 1, 1)) return MDIN_I2C_ERROR;
+ 106   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x042, 0x0000)) return MDIN_I2C_ERROR;
+ 107   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x43, 1, 1, 0)) return MDIN_I2C_ERROR;
+ 108   1        return MDIN_NO_ERROR;
+ 109   1      }
+ 110          
+C51 COMPILER V9.60.7.0   MDINIPC                                                           12/22/2023 18:00:42 PAGE 3   
+
+ 111          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 112          static MDIN_ERROR_t MDIN3xx_SetDeintUltraNR(BOOL OnOff)
+ 113          {
+ 114   1        WORD rVal;
+ 115   1      
+ 116   1        if (MDINHIF_RegRead(MDIN_LOCAL_ID, 0x260, &rVal)) return MDIN_I2C_ERROR;
+ 117   1        if ((rVal&0x0600)!=0x0600) OnOff = OFF;   // if 3DNR is off, then OFF
+ 118   1        
+ 119   1        // nr_n_deint_thres
+ 120   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x264,  8, 8, (OnOff)? 255 : 20)) return MDIN_I2C_ERROR;
+ 121   1      
+ 122   1        // nr_deint_thres
+ 123   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x264,  0, 8, (OnOff)? 255 : 18)) return MDIN_I2C_ERROR;
+ 124   1      
+ 125   1        // mo_nr_th
+ 126   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x265,  4, 3, (OnOff)?   7 :  4)) return MDIN_I2C_ERROR;
+ 127   1      
+ 128   1        // n_mo_nr_th
+ 129   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x265,  0, 3, (OnOff)?   7 :  4)) return MDIN_I2C_ERROR;
+ 130   1      
+ 131   1        // fast_history_nr
+ 132   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x266,  0, 4, (OnOff)?   0 :  8)) return MDIN_I2C_ERROR;
+ 133   1      
+ 134   1        // nr_inter_diff_or_en, nr_avg_inter_diff_or_en
+ 135   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x267, 14, 2, (OnOff)?   3 :  0)) return MDIN_I2C_ERROR;
+ 136   1      
+ 137   1        // nr_inter_diff_thres
+ 138   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x267,  8, 6, (OnOff)?   0 : 63)) return MDIN_I2C_ERROR;
+ 139   1      
+ 140   1        // avg_nr_diff_thres
+ 141   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x267,  0, 8, (OnOff)?   0 : 16)) return MDIN_I2C_ERROR;
+ 142   1      
+ 143   1        // inter_diff_exp_tab
+ 144   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x268,  4, 2, (OnOff)?   3 :  2)) return MDIN_I2C_ERROR;
+ 145   1      
+ 146   1        // nr_avg_inter_diff_exp_tab
+ 147   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x268,  0, 2, (OnOff)?   3 :  2)) return MDIN_I2C_ERROR;
+ 148   1      
+ 149   1        // y_surface_for_nr_surface_hor_th
+ 150   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x23b,  8, 8, (OnOff)?   0 :  3)) return MDIN_I2C_ERROR;
+ 151   1        return MDIN_NO_ERROR;
+ 152   1      }
+ 153          
+ 154          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 155          MDIN_ERROR_t MDIN3xx_EnableDeint3DNR(PMDIN_VIDEO_INFO pINFO, BOOL OnOff)
+ 156          {
+ 157   1        PMDIN_DEINTCTL_INFO pIPC = (PMDIN_DEINTCTL_INFO)&pINFO->stIPC_m;
+ 158   1        PMDIN_SRCVIDEO_INFO pSRC = (PMDIN_SRCVIDEO_INFO)&pINFO->stSRC_m; // added on 16Aug2012    
+ 159   1        PMDIN_OUTVIDEO_INFO pOUT = (PMDIN_OUTVIDEO_INFO)&pINFO->stOUT_m; // added on 20Mar2012
+ 160   1      //  PMDIN_MFCSCALE_INFO pMFC = (PMDIN_MFCSCALE_INFO)&pINFO->stMFC_m;
+ 161   1      //  BYTE mode = (pIPC->fine&MDIN_DEINT_FRC_DOWN)? 1 : 0;
+ 162   1        BYTE mode = ((pIPC->attb&MDIN_DEINT_IPC_PROC)&&(pIPC->fine&MDIN_DEINT_FRC_DOWN))? 1 : 0;  // modified on 0
+             -5Apr2012
+ 163   1      
+ 164   1        if (OnOff)  pIPC->fine |=  MDIN_DEINT_3DNR_ON;
+ 165   1        else    pIPC->fine &= ~MDIN_DEINT_3DNR_ON;
+ 166   1      
+ 167   1        // if ycbcr444_en==1 and progressive input, 3dnr_en = off
+ 168   1        if ((pIPC->attb&MDIN_DEINT_444_PROC)&&(pIPC->attb&MDIN_DEINT_IPC_PROC)==0) OnOff = OFF;
+ 169   1      
+C51 COMPILER V9.60.7.0   MDINIPC                                                           12/22/2023 18:00:42 PAGE 4   
+
+ 170   1        // if 1080p input and dual output, 3dnr_en = off
+ 171   1        if (pIPC->attb&MDIN_DEINT_HD_1080p&&pINFO->dacPATH==DAC_PATH_AUX_OUT) OnOff = OFF;
+ 172   1      
+ 173   1        // for 2-HD input mode
+ 174   1        if (pINFO->dacPATH==DAC_PATH_AUX_2HD) OnOff = OFF;
+ 175   1      
+ 176   1        // if vertical scale ratio<0.5, 3dnr_en = off
+ 177   1        if (pIPC->attb&MDIN_DEINT_p5_SCALE) OnOff = OFF;
+ 178   1      
+ 179   1        // if revision=0 and vertical scale ratio<1.0 and progressive input, 3dnr_en = off
+ 180   1        if ((mdinREV==0)&&
+ 181   1          (pIPC->attb&MDIN_DEINT_DN_SCALE)&&(pIPC->attb&MDIN_DEINT_IPC_PROC)==0) OnOff = OFF;
+ 182   1      
+ 183   1        if (pIPC->attb&MDIN_DEINT_HD_1080i&&
+ 184   1           (pOUT->frmt==VIDOUT_1920x1080i59||pOUT->frmt==VIDOUT_1920x1080i60)) OnOff = OFF; // added on 20Mar2012
+ 185   1      
+ 186   1        if (pIPC->attb&MDIN_DEINT_HD_1080p&&
+ 187   1           (pOUT->frmt==VIDOUT_1920x1080i50||pOUT->frmt==VIDOUT_1920x1080i59||pOUT->frmt==VIDOUT_1920x1080i60)) O
+             -nOff = OFF; // added on 20Mar2012
+ 188   1      
+ 189   1        // prepare for timing problem when 10bit process use (refer to MDIN3xx_Set10BITProcess())
+ 190   1      //  if ((pIPC->attb&MDIN_DEINT_IPC_PROC)==0&&pMFC->stMEM.h==1080&&pMFC->stDST.h==576) OnOff = OFF;
+ 191   1      
+ 192   1        // prepare for timing problem when 10bit process use (refer to MDIN3xx_Set10BITProcess())
+ 193   1      //  if ((pIPC->attb&MDIN_DEINT_HD_1080i)&&(pSRC->stATTB.attb==MDIN_PRECISION_10)) OnOff = OFF; // added on 
+             -16Aug2012
+ 194   1        
+ 195   1        // if 1080p input, 3dnr_en = off
+ 196   1      #if !defined(SYSTEM_USE_MCLK202)
+ 197   1        if (pIPC->attb&MDIN_DEINT_HD_1080p) OnOff = OFF;
+ 198   1      #endif
+ 199   1      
+ 200   1        // common_mode_at_IPC - nr_t_en
+ 201   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x205,  0, 1, (OnOff)? mode : 0)) return MDIN_I2C_ERROR;
+ 202   1      
+ 203   1        // nr_mode_reg - nr_en, nr_write_en
+ 204   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x260, 10, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+ 205   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x260, 12, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+ 206   1      
+ 207   1        // nr_motion_set_reg - nr_mo_sel, nr_all_use_mo
+ 208   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x261, 6, 2, (OnOff)? 2 : 3)) return MDIN_I2C_ERROR;
+ 209   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x261, 0, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+ 210   1      
+ 211   1        // nr_motion_offset_reg - cu_motion_use, n_motion_use, slow_motion_use, still_motion_use
+ 212   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x262, 15, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+ 213   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x262, 14, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+ 214   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x262, 13, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+ 215   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x262, 12, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+ 216   1      
+ 217   1        // mo_history_for_nr_condition - nr_mo_his_update_use_en
+ 218   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x266, 11, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+ 219   1      
+ 220   1        // border_ctrl_reg1 - no_his_border_adp_en
+ 221   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x240, 13, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+ 222   1      
+ 223   1        // set progressive NR scale down
+ 224   1        if (MDIN3xx_ScaleDownProgNR(pINFO, OnOff)) return MDIN_NO_ERROR;
+ 225   1      
+ 226   1        // if 3dnr_en=off & progressive input, mfc_prepend_load = OFF
+ 227   1        OnOff = ((OnOff==OFF)&&((pIPC->attb&MDIN_DEINT_IPC_PROC)==0))? OFF : ON;
+ 228   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x100,  6, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+ 229   1      
+C51 COMPILER V9.60.7.0   MDINIPC                                                           12/22/2023 18:00:42 PAGE 5   
+
+ 230   1        // set ultraNR => if 3dnr_en=on & 3dnr_gain>50, ultraNR = ON
+ 231   1        return MDIN3xx_SetDeintUltraNR((pIPC->gain>50)? ON : OFF);
+ 232   1      }
+ 233          
+ 234          //--------------------------------------------------------------------------------------------------
+ 235          MDIN_ERROR_t MDIN3xx_SetDeint3DNRGain(PMDIN_VIDEO_INFO pINFO, BYTE gain)
+ 236          {
+ 237   1        BYTE level, max = 60; 
+ 238   1        PMDIN_SRCVIDEO_INFO pSRC = (PMDIN_SRCVIDEO_INFO)&pINFO->stSRC_m;
+ 239   1        PMDIN_DEINTCTL_INFO pIPC = (PMDIN_DEINTCTL_INFO)&pINFO->stIPC_m;
+ 240   1      
+ 241   1        // if src is progressive && 8-bit precision then max is 33 or 50
+ 242   1        if ((pSRC->stATTB.attb&MDIN_SCANTYPE_PROG)&&(pSRC->stATTB.attb&MDIN_PRECISION_8))
+ 243   1           level = (mdinREV==0)? 33 : 50; // if revision=0 then 33, others 50.
+ 244   1        else level = 60;
+ 245   1      
+ 246   1        pIPC->gain = MIN(gain,level);
+ 247   1      
+ 248   1        // NR factor level, NR factor not_still_1st
+ 249   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x260, 0, 6, max-pIPC->gain)) return MDIN_I2C_ERROR;
+ 250   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x26a, 0, 6, max-pIPC->gain)) return MDIN_I2C_ERROR;
+ 251   1      
+ 252   1        if ((pSRC->stATTB.attb&MDIN_PRECISION_8))
+ 253   1          if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x260, 8, 1, (pIPC->gain > 43) ? OFF : ON)) return MDIN_I2C_ERROR;
+ 254   1      
+ 255   1        // set ultraNR => if 3dnr_en=on & 3dnr_gain>50, ultraNR = ON
+ 256   1        return MDIN3xx_SetDeintUltraNR((pIPC->gain>50)? ON : OFF);
+ 257   1      }
+ 258          
+ 259          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 260          MDIN_ERROR_t MDIN3xx_EnableDeintCCS(PMDIN_VIDEO_INFO pINFO, BOOL OnOff)
+ 261          {
+ 262   1        PMDIN_DEINTCTL_INFO pIPC = (PMDIN_DEINTCTL_INFO)&pINFO->stIPC_m;
+ 263   1        BOOL pal = (pIPC->attb&MDIN_DEINT_PAL_CCS)? 1 : 0;
+ 264   1      
+ 265   1        if (OnOff)  pIPC->fine |=  MDIN_DEINT_CCS_ON;
+ 266   1        else    pIPC->fine &= ~MDIN_DEINT_CCS_ON;
+ 267   1      
+ 268   1        // if progressive input, ccs_en = off
+ 269   1        if ((pIPC->attb&MDIN_DEINT_IPC_PROC)==0) OnOff = OFF;
+ 270   1      
+ 271   1        // if 1080i input, ccs_en = off
+ 272   1        if (pIPC->attb&MDIN_DEINT_HD_1080i) OnOff = OFF;
+ 273   1      
+ 274   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x248, 14, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+ 275   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x205, 5, 1, MBIT(OnOff,pal))) return MDIN_I2C_ERROR;
+ 276   1        return MDIN_NO_ERROR;
+ 277   1      }
+ 278          
+ 279          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 280          MDIN_ERROR_t MDIN3xx_EnableDeintCUE(PMDIN_VIDEO_INFO pINFO, BOOL OnOff)
+ 281          {
+ 282   1        PMDIN_DEINTCTL_INFO pIPC = (PMDIN_DEINTCTL_INFO)&pINFO->stIPC_m;
+ 283   1        WORD rVal;
+ 284   1      
+ 285   1        if (OnOff)  pIPC->fine |=  MDIN_DEINT_CUE_ON;
+ 286   1        else    pIPC->fine &= ~MDIN_DEINT_CUE_ON;
+ 287   1      
+ 288   1        // if ycbcr444_en==1 and progressive input, cue_en = off
+ 289   1        if ((pIPC->attb&MDIN_DEINT_444_PROC)&&(pIPC->attb&MDIN_DEINT_IPC_PROC)==0) OnOff = OFF;
+C51 COMPILER V9.60.7.0   MDINIPC                                                           12/22/2023 18:00:42 PAGE 6   
+
+ 290   1      
+ 291   1        // if pal_ccs_en==1, cue_en = off
+ 292   1        if (MDINHIF_RegRead(MDIN_LOCAL_ID, 0x205, &rVal)) return MDIN_I2C_ERROR;
+ 293   1        if (rVal&0x0020) OnOff = OFF;
+ 294   1      
+ 295   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x208, 5, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+ 296   1        return MDIN_NO_ERROR;
+ 297   1      }
+ 298          
+ 299          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 300          MDIN_ERROR_t MDIN3xx_SetDeintInterWND(PMDIN_INTER_WINDOW pWND, MDIN_INTER_BLOCK_t nID)
+ 301          {
+ 302   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x278, (WORD)pWND->lx)) return MDIN_I2C_ERROR;  // lx
+ 303   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x279, nID*4+0x80)) return MDIN_I2C_ERROR;
+ 304   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x278, (WORD)pWND->ly)) return MDIN_I2C_ERROR;  // ly
+ 305   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x279, nID*4+0x81)) return MDIN_I2C_ERROR;
+ 306   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x278, (WORD)pWND->rx)) return MDIN_I2C_ERROR;  // rx
+ 307   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x279, nID*4+0x82)) return MDIN_I2C_ERROR;
+ 308   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x278, (WORD)pWND->ry)) return MDIN_I2C_ERROR;  // ry
+ 309   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x279, nID*4+0x83)) return MDIN_I2C_ERROR;
+ 310   1        return MDIN_NO_ERROR;
+ 311   1      }
+ 312          
+ 313          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 314          MDIN_ERROR_t MDIN3xx_EnableDeintInterWND(MDIN_INTER_BLOCK_t nID, BOOL OnOff)
+ 315          {
+ 316   1        if (OnOff)  enInterWND |=  (1<<nID);
+ 317   1        else    enInterWND &= ~(1<<nID);
+ 318   1      
+ 319   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x278, enInterWND)) return MDIN_I2C_ERROR;    // OnOff
+ 320   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x279, 0x80|0x20)) return MDIN_I2C_ERROR;
+ 321   1        return MDIN_NO_ERROR;
+ 322   1      }
+ 323          
+ 324          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 325          /*bob
+ 326          MDIN_ERROR_t MDIN3xx_DisplayDeintInterWND(BOOL OnOff)
+ 327          {
+ 328            WORD mode = (OnOff)? 0x0612 : 0x0000;
+ 329            if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x276, mode)) return MDIN_I2C_ERROR;
+ 330            return MDIN_NO_ERROR;
+ 331          }
+ 332          */
+ 333          /*  FILE_END_HERE */
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   3002    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      1      54
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----       7
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

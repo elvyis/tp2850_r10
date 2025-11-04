@@ -1,0 +1,2800 @@
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MDINHTX
+OBJECT MODULE PLACED IN .\obj\mdinhtx.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE src\MDIN3xx\mdinhtx.c LARGE OPTIMIZE(9,SIZE) BROWSE DEBUG OBJECTEXTEND P
+                    -RINT(.\lst\mdinhtx.lst) TABS(2) OBJECT(.\obj\mdinhtx.obj)
+
+line level    source
+
+   1          //--------------------------------------------------------------------------------------------------------
+             ---------------
+   2          // (C) Copyright 2008  Macro Image Technology Co., LTd. , All rights reserved
+   3          // 
+   4          // This source code is the property of Macro Image Technology and is provided
+   5          // pursuant to a Software License Agreement. This code's reuse and distribution
+   6          // without Macro Image Technology's permission is strictly limited by the confidential
+   7          // information provisions of the Software License Agreement.
+   8          //--------------------------------------------------------------------------------------------------------
+             ----------------
+   9          //
+  10          // File Name      : HDMITX.C
+  11          // Description    :
+  12          // Ref. Docment   : 
+  13          // Revision History   :
+  14          
+  15          // ----------------------------------------------------------------------
+  16          // Include files
+  17          // ----------------------------------------------------------------------
+  18          #include  <string.h>
+  19          #include  "mdin3xx.h"
+  20          
+  21          #if __MDINHTX_DBGPRT__ == 1
+              #include  "..\inc\printf.h" // for printf
+              #endif
+  24          
+  25          #if defined(SYSTEM_USE_MDIN340)||defined(SYSTEM_USE_MDIN380)
+  26          
+  27          // -----------------------------------------------------------------------------
+  28          // Struct/Union Types and define
+  29          // -----------------------------------------------------------------------------
+  30          
+  31          // ----------------------------------------------------------------------
+  32          // Static Global Data section variables
+  33          // ----------------------------------------------------------------------
+  34          static BOOL SetPAGE, GetHDMI = 0;
+  35          static BYTE GetEDID, GetPLUG, GetMDDC;
+  36          
+  37          #if __MDINHTX_DBGPRT__ == 1
+              static BYTE OldPROC = 0xff;
+              #endif
+  40          
+  41          #if SYSTEM_USE_HTX_HDCP == 1
+              static BYTE GetRPT, GetSAME, GetHDCP;
+              static WORD GetCMD, GetMODE, GetFIFO;
+              
+              #if __MDINHTX_DBGPRT__ == 1
+              static WORD GetFAIL = 0;
+              static BYTE OldAUTH = 0xff;
+              #endif
+              #endif
+  50          
+  51          // ----------------------------------------------------------------------
+  52          // External Variable 
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 2   
+
+  53          // ----------------------------------------------------------------------
+  54          
+  55          // ----------------------------------------------------------------------
+  56          // Static Prototype Functions
+  57          // ----------------------------------------------------------------------
+  58          static MDIN_ERROR_t MDINHTX_InitModeDVI(PMDIN_VIDEO_INFO pINFO);
+  59          
+  60          #if SYSTEM_USE_HTX_HDCP == 1
+              static MDIN_ERROR_t MDINHTX_EnableEncryption(BOOL OnOff);
+              static MDIN_ERROR_t MDINHTX_EnableKSVReady(BOOL OnOff);
+              static MDIN_ERROR_t MDINHTX_EnableRISCheck(BOOL OnOff);
+              #endif
+  65          
+  66          // ----------------------------------------------------------------------
+  67          // Static functions
+  68          // ----------------------------------------------------------------------
+  69          
+  70          //--------------------------------------------------------------------------------------------------------
+             -------------------
+  71          // Drive Function for MDDC interface
+  72          //--------------------------------------------------------------------------------------------------------
+             -------------------
+  73          static MDIN_ERROR_t MDINHTX_GetMDDCProcDone(void)
+  74          {
+  75   1        WORD rVal = 0x10, count = 100;
+  76   1      
+  77   1        while (count&&(rVal==0x10)) {
+  78   2          if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x0f2, &rVal)) return MDIN_I2C_ERROR;
+  79   2          rVal &= 0x10; count--;  MDINDLY_10uSec(10);   // delay 100us
+  80   2        }
+  81   1      
+  82   1      #if __MDINHTX_DBGPRT__ == 1
+                if (count==0) Printf("DDC method is failure. DDC FIFO is busy.\n\r");
+              #endif
+  85   1      
+  86   1        return (count)? MDIN_NO_ERROR : MDIN_TIMEOUT_ERROR;
+  87   1      }
+  88          
+  89          //--------------------------------------------------------------------------------------------------------
+             -------------------
+  90          static MDIN_ERROR_t MDINHTX_SetMDDCCmd(PMDIN_HDMIMDDC_INFO pMDDC)
+  91          {
+  92   1        if (MDINHIF_MultiWrite(MDIN_HDMI_ID, 0x0ec, (PBYTE)pMDDC, 6)) return MDIN_I2C_ERROR;
+  93   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x0f2, 0x0900)) return MDIN_I2C_ERROR; // clear FIFO
+  94   1      
+  95   1        if (pMDDC->cmd==0x06) return MDIN_NO_ERROR;   // sequential write commnad
+  96   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x0f2, MAKEWORD(pMDDC->cmd,0))) return MDIN_I2C_ERROR;
+  97   1        return MDIN_NO_ERROR;
+  98   1      }
+  99          
+ 100          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 101          static MDIN_ERROR_t MDINHTX_GetMDDCStatus(void)
+ 102          {
+ 103   1        WORD rVal;
+ 104   1      
+ 105   1        if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x0f2, &rVal)) return MDIN_I2C_ERROR;
+ 106   1      
+ 107   1        // check BUS_LOW, NO_ACK, IN_PROG, FIFO_FULL
+ 108   1        if ((rVal&0x78)==0) return MDIN_NO_ERROR;
+ 109   1      
+ 110   1        // can happen if Rx is clock stretching the SCL line. DDC bus unusable
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 3   
+
+ 111   1        if ((rVal&0x20)!=0) return MDIN_DDC_ACK_ERROR;
+ 112   1      
+ 113   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x0f2, 0x0f00)) return MDIN_I2C_ERROR; // ABORT
+ 114   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x0f2, 0x0a00)) return MDIN_I2C_ERROR; // CLOCK
+ 115   1        return MDIN_NO_ERROR;
+ 116   1      }
+ 117          
+ 118          #if SYSTEM_USE_HTX_HDCP == 1
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_GetRiStatus(void)
+              {
+                WORD rVal = 0x01, count = 1000;
+              
+                while (count&&(rVal==0x01)) {
+                  if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x026, &rVal)) return MDIN_I2C_ERROR;
+                  rVal &= 0x01; count--; MDINDLY_mSec(10);  // delay 10ms
+                }
+              
+              #if __MDINHTX_DBGPRT__ == 1
+                if (count==0) UARTprintf("MDDC bus not relinquished.\n\r");
+              #endif
+              
+                return (count)? MDIN_NO_ERROR : MDIN_TIMEOUT_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_SuspendRiCheck(BOOL OnOff)
+              {
+                MDIN_ERROR_t err = MDIN_NO_ERROR;
+              
+                if (OnOff==ON) {
+                  if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x026, &GetCMD)) return MDIN_I2C_ERROR;
+                  GetCMD = HIBYTE(GetCMD)&0x03; // Save RI_CMD status
+                  if (MDINHTX_EnableRISCheck(OFF)) return MDIN_I2C_ERROR;
+                  if (MDINHTX_EnableKSVReady(OFF)) return MDIN_I2C_ERROR;
+              
+                  // wait for HW to release MDDC bus
+                  err = MDINHTX_GetRiStatus(); if (err==MDIN_I2C_ERROR) return err;
+                  if (err==MDIN_TIMEOUT_ERROR) {  // MDDC bus not relinquished.
+                    return MDINHIF_RegField(MDIN_HDMI_ID, 0x026, 8, 8, GetCMD);
+                  }
+                  if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x026, &GetMODE)) return MDIN_I2C_ERROR;
+                  GetMODE = LOBYTE(GetMODE)&0x01; // Save MDDC bus status
+                  return MDIN_NO_ERROR;
+                }
+              
+                if (GetMODE&&(GetCMD&0x01)) {
+                  if (MDINHTX_EnableRISCheck(ON)) return MDIN_I2C_ERROR;  // re-enable Auto Ri
+                }
+              
+                if (GetCMD&0x02) {
+                  if (MDINHTX_EnableKSVReady(ON)) return MDIN_I2C_ERROR;
+                }
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_SetMDDCBuff(PMDIN_HDMIMDDC_INFO pMDDC)
+              {
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 4   
+
+                WORD i, rVal;
+              
+                for (i=0; i<pMDDC->bytes; i++) {
+                  rVal = (WORD)(pMDDC->pBuff[i]);
+                  if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x0f4, rVal)) return MDIN_I2C_ERROR;
+                }
+                if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x0f2, MAKEWORD(pMDDC->cmd,0))) return MDIN_I2C_ERROR;
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_WriteMDDC(PMDIN_HDMIMDDC_INFO pMDDC)
+              {
+                MDIN_ERROR_t err;
+              
+                if (MDINHTX_SuspendRiCheck(ON)) return MDIN_I2C_ERROR;
+              
+                err = MDINHTX_GetMDDCProcDone(); if (err==MDIN_I2C_ERROR) return err;
+              
+                // Abort Master DCC operation and Clear FIFO pointer
+                if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x0f2, 0x0900)) return MDIN_I2C_ERROR;
+              
+                if (MDINHTX_SetMDDCCmd(pMDDC)) return MDIN_I2C_ERROR;
+                if (MDINHTX_SetMDDCBuff(pMDDC)) return MDIN_I2C_ERROR;
+                err = MDINHTX_GetMDDCProcDone(); if (err==MDIN_I2C_ERROR) return err;
+              
+                err = MDINHTX_GetMDDCStatus(); if (err==MDIN_I2C_ERROR) return err;
+                if (err) GetMDDC = MDIN_DDC_ACK_ERROR;
+              
+              #if __MDINHTX_DBGPRT__ == 1
+                if (err) UARTprintf("DDC Write method is failure. No ACK.\n\r");
+              #endif
+              
+                if (MDINHTX_SuspendRiCheck(OFF)) return MDIN_I2C_ERROR;
+                return MDIN_NO_ERROR;
+              }
+              #endif  /* SYSTEM_USE_HTX_HDCP == 1 */
+ 207          
+ 208          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 209          static MDIN_ERROR_t MDINHTX_GetMDDCBuff(PMDIN_HDMIMDDC_INFO pMDDC)
+ 210          {
+ 211   1        WORD i, rVal;
+ 212   1      
+ 213   1        for (i=0; i<pMDDC->bytes; i++) {
+ 214   2          if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x0f4, &rVal)) return MDIN_I2C_ERROR;
+ 215   2          pMDDC->pBuff[i] = LOBYTE(rVal);
+ 216   2        }
+ 217   1        return MDIN_NO_ERROR;
+ 218   1      }
+ 219          
+ 220          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 221          static MDIN_ERROR_t MDINHTX_ReadMDDC(PMDIN_HDMIMDDC_INFO pMDDC)
+ 222          {
+ 223   1        MDIN_ERROR_t err;
+ 224   1      
+ 225   1      #if SYSTEM_USE_HTX_HDCP == 1
+                if (MDINHTX_SuspendRiCheck(ON)) return MDIN_I2C_ERROR;
+              #endif
+ 228   1      
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 5   
+
+ 229   1        err = MDINHTX_GetMDDCProcDone(); if (err==MDIN_I2C_ERROR) return err;
+ 230   1      
+ 231   1        // Abort Master DCC operation and Clear FIFO pointer
+ 232   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x0f2, 0x0900)) return MDIN_I2C_ERROR;
+ 233   1      
+ 234   1        if (MDINHTX_SetMDDCCmd(pMDDC)) return MDIN_I2C_ERROR;
+ 235   1        err = MDINHTX_GetMDDCProcDone(); if (err==MDIN_I2C_ERROR) return err;
+ 236   1      
+ 237   1        if (MDINHTX_GetMDDCBuff(pMDDC)) return MDIN_I2C_ERROR;
+ 238   1      
+ 239   1        err = MDINHTX_GetMDDCStatus(); if (err==MDIN_I2C_ERROR) return err;
+ 240   1        if (err) GetMDDC = MDIN_DDC_ACK_ERROR;
+ 241   1      
+ 242   1      #if __MDINHTX_DBGPRT__ == 1
+                if (err) Printf("DDC Read method is failure. No ACK.\n\r");
+              #endif
+ 245   1      
+ 246   1      #if SYSTEM_USE_HTX_HDCP == 1
+                if (MDINHTX_SuspendRiCheck(OFF)) return MDIN_I2C_ERROR;
+              #endif
+ 249   1      
+ 250   1        return MDIN_NO_ERROR;
+ 251   1      }
+ 252          
+ 253          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 254          // Drive Function for EDID Parsing
+ 255          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 256          static MDIN_ERROR_t MDINHTX_ReadEDID(BYTE rAddr, PBYTE pBuff, WORD bytes)
+ 257          {
+ 258   1        MDIN_HDMIMDDC_INFO stMDDC; WORD rVal;
+ 259   1      
+ 260   1        if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x0ee, &rVal)) return MDIN_I2C_ERROR;
+ 261   1        rVal = LOBYTE(rVal);
+ 262   1      
+ 263   1        stMDDC.sAddr  = MAKEWORD(0xa0, 0);
+ 264   1        stMDDC.rAddr  = MAKEWORD(rAddr, rVal);
+ 265   1        stMDDC.bytes  = bytes;
+ 266   1        stMDDC.pBuff  = pBuff;
+ 267   1        stMDDC.cmd    = (rVal)? 4 : 2;  // enhanced read or sequential read
+ 268   1        return MDINHTX_ReadMDDC(&stMDDC);
+ 269   1      }
+ 270          
+ 271          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 272          static MDIN_ERROR_t MDINHTX_ParseHeader(PMDIN_HDMICTRL_INFO pCTL)
+ 273          {
+ 274   1        BYTE i, rBuff[8];
+ 275   1      
+ 276   1        if (MDINHTX_ReadEDID(0x00, rBuff, 8)) return MDIN_I2C_ERROR;
+ 277   1      
+ 278   1        if ((rBuff[0]|rBuff[7])) pCTL->err = EDID_BAD_HEADER;
+ 279   1      
+ 280   1        for (i=1; i<7; i++) {
+ 281   2          if (rBuff[i]!=0xff) pCTL->err = EDID_BAD_HEADER;
+ 282   2        }
+ 283   1        return MDIN_NO_ERROR;
+ 284   1      }
+ 285          
+ 286          //--------------------------------------------------------------------------------------------------------
+             -------------------
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 6   
+
+ 287          static MDIN_ERROR_t MDINHTX_ParseVersion(PMDIN_HDMICTRL_INFO pCTL)
+ 288          {
+ 289   1        BYTE rBuff[2];
+ 290   1      
+ 291   1        if (MDINHTX_ReadEDID(0x12, rBuff, 2)) return MDIN_I2C_ERROR;
+ 292   1      
+ 293   1        if ((rBuff[0]!=1)||(rBuff[1]<3)) pCTL->err = EDID_VER_NOT861B;
+ 294   1        else               pCTL->err = MDIN_NO_ERROR;
+ 295   1        return MDIN_NO_ERROR;
+ 296   1      }
+ 297          
+ 298          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 299          static MDIN_ERROR_t MDINHTX_CheckCRC(BYTE rAddr)
+ 300          {
+ 301   1        BYTE i, j, rBuff[8], CRC = 0;
+ 302   1      
+ 303   1        for (i=0; i<16; i++) {
+ 304   2          if (MDINHTX_ReadEDID(rAddr+i*8, rBuff, 8)) return MDIN_I2C_ERROR;
+ 305   2      
+ 306   2          for (j=0; j<8; j++) CRC += rBuff[j];
+ 307   2        }
+ 308   1        return (CRC)? MDIN_DDC_CRC_ERROR : MDIN_NO_ERROR;
+ 309   1      }
+ 310          
+ 311          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 312          static MDIN_ERROR_t MDINHTX_Check1stCRC(PMDIN_HDMICTRL_INFO pCTL)
+ 313          {
+ 314   1        MDIN_ERROR_t err;
+ 315   1      
+ 316   1        err = MDINHTX_CheckCRC(0x00);
+ 317   1        if (err!=MDIN_DDC_CRC_ERROR) return err;
+ 318   1      
+ 319   1        pCTL->err = EDID_1ST_CRC_ERR;
+ 320   1        if (MDINHTX_ParseVersion(pCTL)) return MDIN_I2C_ERROR;
+ 321   1        return MDIN_NO_ERROR;
+ 322   1      }
+ 323          
+ 324          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 325          static MDIN_ERROR_t MDINHTX_Check2ndCRC(PMDIN_HDMICTRL_INFO pCTL)
+ 326          {
+ 327   1        MDIN_ERROR_t err;
+ 328   1      
+ 329   1        err = MDINHTX_CheckCRC(0x80);
+ 330   1        if (err!=MDIN_DDC_CRC_ERROR) return err;
+ 331   1      
+ 332   1        pCTL->err = EDID_2ND_CRC_ERR;
+ 333   1        if (MDINHTX_ParseVersion(pCTL)) return MDIN_I2C_ERROR;
+ 334   1        return MDIN_NO_ERROR;
+ 335   1      }
+ 336          
+ 337          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 338          static MDIN_ERROR_t MDINHTX_BasicParse(PMDIN_HDMICTRL_INFO pCTL)
+ 339          {
+ 340   1        if (MDINHTX_ParseHeader(pCTL)) return MDIN_I2C_ERROR;
+ 341   1        if (pCTL->err) return MDIN_NO_ERROR;
+ 342   1      
+ 343   1        if (MDINHTX_Check1stCRC(pCTL)) return MDIN_I2C_ERROR;
+ 344   1        return MDIN_NO_ERROR;
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 7   
+
+ 345   1      }
+ 346          
+ 347          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 348          static MDIN_ERROR_t MDINHTX_GetVendorAddr(PBYTE pBuff)
+ 349          {
+ 350   1        BYTE rAddr, eAddr, rBuff[2];
+ 351   1      
+ 352   1        rAddr = (SetPAGE)? 0x02 : 0x82;
+ 353   1        if (MDINHTX_ReadEDID(rAddr, rBuff, 2)) return MDIN_I2C_ERROR;
+ 354   1        if (rBuff[0]<4) return MDIN_NO_ERROR;
+ 355   1      
+ 356   1        rAddr = ((SetPAGE)? 0x04 : 0x84);
+ 357   1        eAddr = ((SetPAGE)? 0x03 : 0x80) + rBuff[0];
+ 358   1      
+ 359   1        while (rAddr<eAddr) {
+ 360   2          if (MDINHTX_ReadEDID(rAddr, rBuff, 1)) return MDIN_I2C_ERROR;
+ 361   2      
+ 362   2          if ((rBuff[0]&0xe0)==0x60) {*pBuff = rAddr; break;}
+ 363   2          rAddr += ((rBuff[0]&0x1f) + 1);
+ 364   2        }
+ 365   1        return MDIN_NO_ERROR;
+ 366   1      }
+ 367          
+ 368          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 369          static MDIN_ERROR_t MDINHTX_CheckHDMISignature(PMDIN_HDMICTRL_INFO pCTL)
+ 370          {
+ 371   1        BYTE rAddr = 0, rBuff[3];
+ 372   1      
+ 373   1        pCTL->phy = 0xffff; // clear physical address
+ 374   1        if (MDINHTX_GetVendorAddr(&rAddr)) return MDIN_I2C_ERROR;
+ 375   1      
+ 376   1        // HDMI Signature block not found
+ 377   1        if (rAddr==0) {pCTL->err = EDID_VER_NOTHDMI; return MDIN_NO_ERROR;}
+ 378   1      
+ 379   1        if (MDINHTX_ReadEDID(rAddr+1, rBuff, 3)) return MDIN_I2C_ERROR;
+ 380   1      
+ 381   1        if (rBuff[0]!=0x03||rBuff[1]!=0x0c||rBuff[2]!=0x00) {
+ 382   2          pCTL->err = EDID_VER_NOTHDMI; return MDIN_NO_ERROR;
+ 383   2        }
+ 384   1      
+ 385   1        if (MDINHTX_ReadEDID(rAddr+4, rBuff, 2)) return MDIN_I2C_ERROR;
+ 386   1        pCTL->phy = MAKEWORD(rBuff[0], rBuff[1]);
+ 387   1      
+ 388   1      #if __MDINHTX_DBGPRT__ == 1
+                Printf("PhyAddr = 0x%04x\n\r", pCTL->phy);
+              #endif
+ 391   1      
+ 392   1        return MDIN_NO_ERROR;
+ 393   1      }
+ 394          /*
+ 395          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 396          static void MDINHTX_ShowParseDetailedTDPart1(PBYTE pBuff)
+ 397          {
+ 398          #if __MDINHTX_DBGPRT__ == 1
+ 399            UARTprintf(" H Active %d ", MAKEWORD(HI4BIT(pBuff[2]),pBuff[0]));
+ 400            UARTprintf(" H Blank %d ", MAKEWORD(LO4BIT(pBuff[2]),pBuff[1]));
+ 401            UARTprintf(" V Active %d ", MAKEWORD(HI4BIT(pBuff[5]),pBuff[3]));
+ 402            UARTprintf(" V Blank %d ", MAKEWORD(LO4BIT(pBuff[5]),pBuff[4]));
+ 403          #endif
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 8   
+
+ 404          }
+ 405          
+ 406          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 407          static void  MDINHTX_ShowParseDetailedTDPart2(PBYTE pBuff)
+ 408          {
+ 409          #if __MDINHTX_DBGPRT__ == 1
+ 410            UARTprintf(" H Sync Offset %d", MAKEWORD(HI4BIT(pBuff[3])>>2,pBuff[0]));
+ 411            UARTprintf(" H Sync Pulse W %d", MAKEWORD(HI4BIT(pBuff[3])&3,pBuff[1]));
+ 412            UARTprintf(" V Sync Offset %d", MAKEBYTE(LO4BIT(pBuff[3])>>2,HI4BIT(pBuff[2])));
+ 413            UARTprintf(" V Sync Pulse W %d", MAKEBYTE(LO4BIT(pBuff[3])&3,LO4BIT(pBuff[2])));
+ 414          #endif
+ 415          }
+ 416          
+ 417          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 418          static void  MDINHTX_ShowParseDetailedTDPart3(PBYTE pBuff)
+ 419          {
+ 420          #if __MDINHTX_DBGPRT__ == 1
+ 421            UARTprintf(" H Image Size %d", MAKEWORD(HI4BIT(pBuff[2]),pBuff[0]));
+ 422            UARTprintf(" V Image Size %d", MAKEWORD(LO4BIT(pBuff[2]),pBuff[1]));
+ 423            UARTprintf(" H Border %d V Border %d\n\r", pBuff[3], pBuff[4]);
+ 424          
+ 425            if (pBuff[5]&0x80) UARTprintf(" Interlaced");
+ 426            else         UARTprintf(" Non-interlaced");
+ 427          
+ 428            if (pBuff[5]&0x60) UARTprintf(" Table 3.17 for defenition:");
+ 429            else         UARTprintf(" Normal Display:");
+ 430          
+ 431            if (pBuff[5]&0x10) UARTprintf(" Digital\n\r");
+ 432            else         UARTprintf(" Analog\n\r");
+ 433          #endif
+ 434          }
+ 435          
+ 436          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 437          static void MDINHTX_ShowParseShortTDPart(PBYTE pBuff, BYTE size)
+ 438          {
+ 439          #if __MDINHTX_DBGPRT__ == 1
+ 440            BYTE i;
+ 441          
+ 442            UARTprintf(" CEA861 Modes:\n\r");
+ 443            for (i=0; i<size; i++) {
+ 444              UARTprintf(" ID %d",(pBuff[i]&0x7f));
+ 445              if (pBuff[i]&0x80) UARTprintf(" Native mode\n\r");
+ 446              else         UARTprintf(" Non-Native\n\r");
+ 447            }
+ 448          #endif
+ 449          }
+ 450          
+ 451          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 452          static MDIN_ERROR_t MDINHTX_ParseVideoDATABlock(BYTE rAddr)
+ 453          {
+ 454            BYTE bytes, len, rBuff[8];
+ 455          
+ 456            if (MDINHTX_ReadEDID(rAddr, &bytes, 1)) return MDIN_I2C_ERROR;
+ 457          
+ 458            rAddr++; bytes &= 0x1f;
+ 459          
+ 460            while (bytes>0) {
+ 461              len = MIN(bytes,8);
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 9   
+
+ 462              if (MDINHTX_ReadEDID(rAddr, rBuff, len)) return MDIN_I2C_ERROR;
+ 463              MDINHTX_ShowParseShortTDPart(rBuff, len); // debug print
+ 464              rAddr += len; bytes -= len;
+ 465            }
+ 466            return MDIN_NO_ERROR;
+ 467          }
+ 468          
+ 469          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 470          static void MDINHTX_ShowParseShortADPart(PBYTE pBuff)
+ 471          {
+ 472          #if __MDINHTX_DBGPRT__ == 1
+ 473            BYTE frmt = (pBuff[0]&0xf8)>>3;
+ 474            UARTprintf("Audio Format Code %d ", frmt);
+ 475          
+ 476            switch (frmt) {
+ 477              case  1: UARTprintf("Liniar PCM\n\r"); break;
+ 478              case  2: UARTprintf("AC-3\n\r"); break;
+ 479              case  3: UARTprintf("MPEG-1\n\r"); break;
+ 480              case  4: UARTprintf("MP3\n\r"); break;
+ 481              case  5: UARTprintf("MPEG2\n\r"); break;
+ 482              case  6: UARTprintf("ACC\n\r"); break;
+ 483              case  7: UARTprintf("DTS\n\r"); break;
+ 484              case  8: UARTprintf("ATRAC\n\r"); break;
+ 485              default: UARTprintf("reserved\n\r"); break;
+ 486            }
+ 487          
+ 488            UARTprintf("Max N of channels %d\n\r", ((pBuff[0]&0x03)+1));
+ 489            if (pBuff[1]&0x01) UARTprintf(" Fs: 32KHz\n\r");
+ 490            if (pBuff[1]&0x02) UARTprintf(" Fs: 44KHz\n\r");
+ 491            if (pBuff[1]&0x04) UARTprintf(" Fs: 48KHz\n\r");
+ 492            if (pBuff[1]&0x08) UARTprintf(" Fs: 88KHz\n\r");
+ 493            if (pBuff[1]&0x10) UARTprintf(" Fs: 96KHz\n\r");
+ 494            if (pBuff[1]&0x20) UARTprintf(" Fs: 176KHz\n\r");
+ 495            if (pBuff[1]&0x40) UARTprintf(" Fs: 192KHz\n\r");
+ 496          
+ 497            if (frmt==1) {
+ 498              UARTprintf("Supported length: ");
+ 499              if (pBuff[2]&0x01) UARTprintf(" 16bits\n\r");
+ 500              if (pBuff[2]&0x02) UARTprintf(" 20bits\n\r");
+ 501              if (pBuff[2]&0x04) UARTprintf(" 24bits\n\r");
+ 502            }
+ 503            else UARTprintf(" Maximum bit rate %d KHz\n\r", (pBuff[2]<<3));
+ 504          #endif
+ 505          }
+ 506          
+ 507          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 508          static MDIN_ERROR_t MDINHTX_ParseAudioDATABlock(BYTE rAddr)
+ 509          {
+ 510            BYTE bytes, len, rBuff[3];
+ 511          
+ 512            if (MDINHTX_ReadEDID(rAddr, &bytes, 1)) return MDIN_I2C_ERROR;
+ 513          
+ 514            rAddr++; len = 0; bytes &= 0x1f;
+ 515            do {
+ 516              if (MDINHTX_ReadEDID(rAddr, rBuff, 3)) return MDIN_I2C_ERROR;
+ 517              MDINHTX_ShowParseShortADPart(rBuff);  // debug print
+ 518              len += 3; rAddr += 3;
+ 519            } while (len<bytes);
+ 520          
+ 521            return MDIN_NO_ERROR;
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 10  
+
+ 522          }
+ 523          
+ 524          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 525          static MDIN_ERROR_t MDINHTX_ParseSpeakDATABlock(BYTE rAddr)
+ 526          {
+ 527          #if __MDINHTX_DBGPRT__ == 1
+ 528            BYTE rVal;
+ 529          
+ 530            if (MDINHTX_ReadEDID(rAddr+1, &rVal, 1)) return MDIN_I2C_ERROR;
+ 531          
+ 532            if (rVal&0x01) UARTprintf("Speakers' allocation: FL/FR\n\r");
+ 533            if (rVal&0x02) UARTprintf("Speakers' allocation: LFE\n\r");
+ 534            if (rVal&0x04) UARTprintf("Speakers' allocation: FC\n\r");
+ 535            if (rVal&0x08) UARTprintf("Speakers' allocation: RL/RR\n\r");
+ 536            if (rVal&0x10) UARTprintf("Speakers' allocation: RC\n\r");
+ 537            if (rVal&0x20) UARTprintf("Speakers' allocation: FLC/FRC\n\r");
+ 538            if (rVal&0x40) UARTprintf("Speakers' allocation: RLC/RRC\n\r");
+ 539          #endif
+ 540            return MDIN_NO_ERROR;
+ 541          }
+ 542          
+ 543          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 544          static MDIN_ERROR_t MDINHTX_ParseVSpecDATABlock(BYTE rAddr)
+ 545          {
+ 546            BYTE rBuff[3], phyAddr[2];
+ 547          
+ 548            if (MDINHTX_ReadEDID(rAddr+1, rBuff, 3)) return MDIN_I2C_ERROR;
+ 549          
+ 550            if (rBuff[0]!=0x03||rBuff[1]!=0x0c||rBuff[2]!=0x00) return MDIN_I2C_ERROR;
+ 551          
+ 552            if (MDINHTX_ReadEDID(rAddr+4, phyAddr, 2)) return MDIN_I2C_ERROR;
+ 553          
+ 554          //  CECSetPhysicalAddress(phyAddr);
+ 555          
+ 556          #if __MDINHTX_DBGPRT__ == 1
+ 557            UARTprintf("PhyAddr : %d.%d.%d.%d\n\r", HI4BIT(phyAddr[0]), LO4BIT(phyAddr[0]), HI4BIT(phyAddr[1]), LO4BI
+             -T(phyAddr[1]));
+ 558          #endif
+ 559          
+ 560            return MDIN_NO_ERROR;
+ 561          }
+ 562          
+ 563          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 564          static MDIN_ERROR_t MDINHTX_GetParseCEADATABlock(void)
+ 565          {
+ 566            BYTE rAddr, tAddr, rVal, err = 0;
+ 567          
+ 568            rAddr = (SetPAGE)? 0x02 : 0x82;
+ 569            if (MDINHTX_ReadEDID(rAddr, &rVal, 1)) return MDIN_I2C_ERROR;
+ 570            
+ 571            rAddr = (SetPAGE)? 0x04 : 0x84; rVal += rAddr;
+ 572            do {
+ 573              if (MDINHTX_ReadEDID(rAddr, &tAddr, 1)) return MDIN_I2C_ERROR;
+ 574              switch (tAddr&0xe0) {
+ 575                case 0x40: err = MDINHTX_ParseVideoDATABlock(rAddr); break;
+ 576                case 0x20: err = MDINHTX_ParseAudioDATABlock(rAddr); break;
+ 577                case 0x80: err = MDINHTX_ParseSpeakDATABlock(rAddr); break;
+ 578                case 0x60: err = MDINHTX_ParseVSpecDATABlock(rAddr); break;
+ 579              }
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 11  
+
+ 580              if (err) break; rAddr += (tAddr&0x1f)+1;   // next Tag Address
+ 581            } while (rAddr<rVal);
+ 582          
+ 583            return MDIN_NO_ERROR;
+ 584          }
+ 585          
+ 586          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 587          static MDIN_ERROR_t MDINHTX_GetParseEDIDDTDBlock(void)
+ 588          {
+ 589            BYTE rAddr, eAddr, rBuff[6];
+ 590          
+ 591            rAddr = (SetPAGE)? 0x02 : 0x82;
+ 592            if (MDINHTX_ReadEDID(rAddr, rBuff, 1)) return MDIN_I2C_ERROR;
+ 593          
+ 594            rAddr = rBuff[0] + (SetPAGE)? 0x00 : 0x80;
+ 595            if (MDINHTX_ReadEDID(rAddr, rBuff, 2)) return MDIN_I2C_ERROR;
+ 596          
+ 597            eAddr = (SetPAGE)? 0x6c : 0xec;
+ 598            while (rBuff[0]||rBuff[1]) {
+ 599              if (MDINHTX_ReadEDID(rAddr+2, rBuff, 6)) return MDIN_I2C_ERROR;
+ 600              MDINHTX_ShowParseDetailedTDPart1(rBuff);  // debug print
+ 601          
+ 602              if (MDINHTX_ReadEDID(rAddr+8, rBuff, 4)) return MDIN_I2C_ERROR;
+ 603              MDINHTX_ShowParseDetailedTDPart2(rBuff);  // debug print
+ 604          
+ 605              if (MDINHTX_ReadEDID(rAddr+12, rBuff, 6)) return MDIN_I2C_ERROR;
+ 606              MDINHTX_ShowParseDetailedTDPart3(rBuff);  // debug print
+ 607          
+ 608              if (rAddr>eAddr) break;   rAddr += 18;
+ 609          
+ 610              if (MDINHTX_ReadEDID(rAddr, rBuff, 2)) return MDIN_I2C_ERROR;
+ 611            }
+ 612            return MDIN_NO_ERROR;
+ 613          }
+ 614          
+ 615          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 616          static MDIN_ERROR_t MDINHTX_GetParse861BExtension(void)
+ 617          {
+ 618            if (MDINHTX_GetParseCEADATABlock()) return MDIN_I2C_ERROR;
+ 619            if (MDINHTX_GetParseEDIDDTDBlock()) return MDIN_I2C_ERROR;
+ 620            return MDIN_NO_ERROR;
+ 621          }
+ 622          
+ 623          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 624          static void MDINHTX_ShowParseEstablishTiming(PBYTE pBuff)
+ 625          {
+ 626          #if __MDINHTX_DBGPRT__ == 1
+ 627            if (pBuff[0]&0x80) UARTprintf(" 720 x  400 @ 70Hz\n\r");
+ 628            if (pBuff[0]&0x40) UARTprintf(" 720 x  400 @ 88Hz\n\r");
+ 629            if (pBuff[0]&0x20) UARTprintf(" 640 x  480 @ 60Hz\n\r");
+ 630            if (pBuff[0]&0x10) UARTprintf(" 640 x  480 @ 67Hz\n\r");
+ 631            if (pBuff[0]&0x08) UARTprintf(" 640 x  480 @ 72Hz\n\r");
+ 632            if (pBuff[0]&0x04) UARTprintf(" 640 x  480 @ 75Hz\n\r");
+ 633            if (pBuff[0]&0x02) UARTprintf(" 800 x  600 @ 56Hz\n\r");
+ 634            if (pBuff[0]&0x01) UARTprintf(" 800 x  400 @ 60Hz\n\r");
+ 635          
+ 636            if (pBuff[1]&0x80) UARTprintf(" 800 x  600 @ 72Hz\n\r");
+ 637            if (pBuff[1]&0x40) UARTprintf(" 800 x  600 @ 75Hz\n\r");
+ 638            if (pBuff[1]&0x20) UARTprintf(" 832 x  624 @ 75Hz\n\r");
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 12  
+
+ 639            if (pBuff[1]&0x10) UARTprintf("1024 x  768 @ 87Hz\n\r");
+ 640            if (pBuff[1]&0x08) UARTprintf("1024 x  768 @ 60Hz\n\r");
+ 641            if (pBuff[1]&0x04) UARTprintf("1024 x  768 @ 70Hz\n\r");
+ 642            if (pBuff[1]&0x02) UARTprintf("1024 x  768 @ 75Hz\n\r");
+ 643            if (pBuff[1]&0x01) UARTprintf("1280 x 1024 @ 75Hz\n\r");
+ 644          
+ 645            if (pBuff[2]&0x80) UARTprintf("1152 x  870 @ 75Hz\n\r");
+ 646          
+ 647            if ((pBuff[0]==0)&&(pBuff[1]==0)&&(pBuff[2]==0))
+ 648              UARTprintf("No established video modes\n\r");
+ 649          #endif
+ 650          }
+ 651          
+ 652          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 653          static void MDINHTX_ShowParseStandardTiming(PBYTE pBuff, BYTE mode)
+ 654          {
+ 655          #if __MDINHTX_DBGPRT__ == 1
+ 656            BYTE i, TmpVal;
+ 657          
+ 658            mode *= 4; TmpVal = mode+4;
+ 659            for (i=0; mode<TmpVal; mode++) {
+ 660              i++;
+ 661              UARTprintf(" Mode %d ", mode);
+ 662              if ((pBuff[i]==0x01)&&(pBuff[i+1]==0x01)) {
+ 663                UARTprintf(" wasn't defined!\n\r");
+ 664              }
+ 665              else {
+ 666                UARTprintf(" Hor Act pixels %d ", ((pBuff[mode]+31)*8));
+ 667                UARTprintf(" Aspect ratio: ");
+ 668                TmpVal = pBuff[mode+1]&0xc0;
+ 669                if(TmpVal==0x00)    UARTprintf("16:10");
+ 670                else if(TmpVal==0x40) UARTprintf("4:3");
+ 671                else if(TmpVal==0x80) UARTprintf("5:4");
+ 672                else          UARTprintf("16:9");
+ 673                UARTprintf(" Refresh rate %d Hz\n\r", ((pBuff[mode+1])&0x3f)+60);
+ 674              }
+ 675            }
+ 676          #endif
+ 677          }
+ 678          
+ 679          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 680          static MDIN_ERROR_t MDINHTX_GetParseTimingDesc(void)
+ 681          {
+ 682            BYTE i, rBuff[8];
+ 683          
+ 684            if (MDINHTX_ReadEDID(0x23, rBuff, 3)) return MDIN_I2C_ERROR;
+ 685            MDINHTX_ShowParseEstablishTiming(rBuff);  // debug print
+ 686          
+ 687          #if __MDINHTX_DBGPRT__ == 1
+ 688            UARTprintf("Standard Timing:\n\r");
+ 689          #endif
+ 690          
+ 691            if (MDINHTX_ReadEDID(0x26, rBuff, 8)) return MDIN_I2C_ERROR;
+ 692            MDINHTX_ShowParseStandardTiming(rBuff, 0);  // debug print
+ 693          
+ 694            if (MDINHTX_ReadEDID(0x2e, rBuff, 8)) return MDIN_I2C_ERROR;
+ 695            MDINHTX_ShowParseStandardTiming(rBuff, 1);  // debug print
+ 696          
+ 697          #if __MDINHTX_DBGPRT__ == 1
+ 698            UARTprintf(" Detailed Timing: \n\r");
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 13  
+
+ 699          #endif
+ 700          
+ 701            for (i=0; i<4; i++) {
+ 702          
+ 703          #if __MDINHTX_DBGPRT__ == 1
+ 704              UARTprintf(" Descriptor %d:\n\r", i);
+ 705          #endif
+ 706          
+ 707              if (MDINHTX_ReadEDID(0x36+i*18, rBuff, 4)) return MDIN_I2C_ERROR;
+ 708              if (rBuff[0]==0&&rBuff[1]==0) continue;
+ 709          
+ 710              if (MDINHTX_ReadEDID(0x38+i*18, rBuff, 6)) return MDIN_I2C_ERROR;
+ 711              MDINHTX_ShowParseDetailedTDPart1(rBuff);  // debug print
+ 712          
+ 713              if (MDINHTX_ReadEDID(0x3e+i*18, rBuff, 4)) return MDIN_I2C_ERROR;
+ 714              MDINHTX_ShowParseDetailedTDPart2(rBuff);  // debug print
+ 715          
+ 716              if (MDINHTX_ReadEDID(0x42+i*18, rBuff, 6)) return MDIN_I2C_ERROR;
+ 717              MDINHTX_ShowParseDetailedTDPart3(rBuff);  // debug print
+ 718            }
+ 719            return MDIN_NO_ERROR;
+ 720          }
+ 721          */
+ 722          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 723          static MDIN_ERROR_t MDINHTX_SetNativeModeBy861B(PMDIN_HDMICTRL_INFO pCTL)
+ 724          {
+ 725   1        BYTE rVal;
+ 726   1      
+ 727   1        if (MDINHTX_ReadEDID(0x83, &rVal, 1)) return MDIN_I2C_ERROR;
+ 728   1      
+ 729   1        switch (rVal&0x30) {
+ 730   2          case 0x10:  pCTL->mode = HDMI_OUT_SEP422_8; break;
+ 731   2          case 0x20:
+ 732   2          case 0x30:  pCTL->mode = HDMI_OUT_YUV444_8; break;
+ 733   2          default:  pCTL->mode = HDMI_OUT_RGB444_8; break;
+ 734   2        }
+ 735   1      
+ 736   1      #if __MDINHTX_DBGPRT__ == 1
+                Printf(" DTV monitor supports: \n\r");
+                if (rVal&0x80) Printf(" Underscan");
+                if (rVal&0x40) Printf(" Basic audio");
+                if (rVal&0x20) Printf(" YCbCr 4:4:4");
+                if (rVal&0x10) Printf(" YCbCr 4:2:2");
+                Printf("\n\r");
+              #endif
+ 744   1      
+ 745   1        return MDIN_NO_ERROR;
+ 746   1      }
+ 747          
+ 748          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 749          static MDIN_ERROR_t MDINHTX_SetNativeFrmtByDTD(PMDIN_HDMICTRL_INFO pCTL)
+ 750          {
+ 751   1        BYTE i, rBuff[6]; WORD blkH, blkV, totH, totV, posH, posV;
+ 752   1      
+ 753   1        pCTL->frmt = 0xff;    // clear native format
+ 754   1        blkH = blkV = totH = totV = posH = posV = 0;
+ 755   1      
+ 756   1        for (i=0; i<4; i++) {
+ 757   2          if (MDINHTX_ReadEDID(i*18+0x36, rBuff, 2)) return MDIN_I2C_ERROR;
+ 758   2          if (rBuff[0]==0&&rBuff[1]==0) continue;
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 14  
+
+ 759   2      
+ 760   2          if (MDINHTX_ReadEDID(i*18+0x38, rBuff, 6)) return MDIN_I2C_ERROR;
+ 761   2          blkH = MAKEWORD(LO4BIT(rBuff[2]),rBuff[1]);
+ 762   2          blkV = MAKEWORD(LO4BIT(rBuff[5]),rBuff[4]);
+ 763   2          totH = MAKEWORD(HI4BIT(rBuff[2]),rBuff[0]) + blkH;
+ 764   2          totV = MAKEWORD(HI4BIT(rBuff[5]),rBuff[3]) + blkV;
+ 765   2      
+ 766   2          if (MDINHTX_ReadEDID(i*18+0x3e, rBuff, 4)) return MDIN_I2C_ERROR;
+ 767   2          posH = blkH - MAKEWORD(HI4BIT(rBuff[3])>>2,rBuff[0]);
+ 768   2          posV = blkV - MAKEBYTE(LO4BIT(rBuff[3])>>2,HI4BIT(rBuff[2]));
+ 769   2      
+ 770   2          break;
+ 771   2        }
+ 772   1      
+ 773   1      #if __MDINHTX_DBGPRT__ == 1
+                Printf("totH=%d, totV=%d, posH=%d, posV=%d\n\r", totH, totV, posH, posV);
+              #endif
+ 776   1      
+ 777   1        for (i=0; i<VIDOUT_FORMAT_END; i++) {
+ 778   2          if (totH!=defMDINHTXVideo[i].stFREQ.pixels) continue;
+ 779   2          if (totV!=defMDINHTXVideo[i].stFREQ.v_line) continue;
+ 780   2          if (posH!=defMDINHTXVideo[i].stWIND.x) continue;
+ 781   2          if (posV!=defMDINHTXVideo[i].stWIND.y) continue;
+ 782   2      
+ 783   2          pCTL->frmt = defMDINHTXVideo[i].stMODE.id_1; break;
+ 784   2        }
+ 785   1      
+ 786   1      #if __MDINHTX_DBGPRT__ == 1
+                Printf("Native Format from DTD = %d\n\r", pCTL->frmt);
+              #endif
+ 789   1      
+ 790   1        return MDIN_NO_ERROR;
+ 791   1      }
+ 792          
+ 793          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 794          static MDIN_ERROR_t MDINHTX_SetNativeFrmtByVID(PMDIN_HDMICTRL_INFO pCTL)
+ 795          {
+ 796   1        BYTE rAddr, tagID, rVal, bytes;
+ 797   1      
+ 798   1        rAddr = (SetPAGE)? 0x02 : 0x82;
+ 799   1        if (MDINHTX_ReadEDID(rAddr, &rVal, 1)) return MDIN_I2C_ERROR;
+ 800   1        if (rVal==4||rVal==0) return MDIN_NO_ERROR;
+ 801   1        
+ 802   1        rAddr = (SetPAGE)? 0x04 : 0x84;   bytes = rAddr + rVal;
+ 803   1      
+ 804   1        while (rAddr<bytes) {
+ 805   2          if (MDINHTX_ReadEDID(rAddr, &tagID, 1)) return MDIN_I2C_ERROR;
+ 806   2          if ((tagID&0xe0)==0x40) break;
+ 807   2          rAddr += ((tagID&0x1f)+1);  // next tag address
+ 808   2        }
+ 809   1      
+ 810   1        rAddr++; bytes = rAddr + (tagID&0x1f);
+ 811   1        while (rAddr<bytes) {
+ 812   2          if (MDINHTX_ReadEDID(rAddr++, &rVal, 1)) return MDIN_I2C_ERROR;
+ 813   2          if (rVal&0x80) {pCTL->frmt = rVal&0x7f; break;}
+ 814   2      
+ 815   2        #if __MDINHTX_DBGPRT__ == 1
+                  Printf("non-Native Format from VID = %d\n\r", rVal);
+                #endif
+ 818   2        }
+ 819   1      
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 15  
+
+ 820   1      #if __MDINHTX_DBGPRT__ == 1
+                Printf("Native Format from VID = %d\n\r", pCTL->frmt);
+              #endif
+ 823   1      
+ 824   1        return MDIN_NO_ERROR;
+ 825   1      }
+ 826          
+ 827          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 828          static MDIN_ERROR_t MDINHTX_ParseEDID(PMDIN_HDMICTRL_INFO pCTL)
+ 829          {
+ 830   1        BYTE rVal, rNum, rAddr = 0;
+ 831   1      
+ 832   1        SetPAGE = 0;  // must preserve proc & auth value
+ 833   1        memset((PBYTE)pCTL, 0, sizeof(MDIN_HDMICTRL_INFO)-2);
+ 834   1      
+ 835   1        if (MDINHTX_BasicParse(pCTL)) return MDIN_I2C_ERROR;
+ 836   1        if (pCTL->err) return MDIN_NO_ERROR;
+ 837   1      
+ 838   1        // set native format from detailed timing descriptor
+ 839   1        if (MDINHTX_SetNativeFrmtByDTD(pCTL)) return MDIN_I2C_ERROR;
+ 840   1      
+ 841   1        // Check 861B extension
+ 842   1        if (MDINHTX_ReadEDID(0x7e, &rNum, 1)) return MDIN_I2C_ERROR;
+ 843   1        if (rNum==0) {
+ 844   2          pCTL->err = EDID_EXT_NOT861B; return MDIN_NO_ERROR;
+ 845   2        }
+ 846   1      
+ 847   1        // Check CRC, sum of extension (128 BYTEs) must be Zero (0)
+ 848   1        if (MDINHTX_Check2ndCRC(pCTL)) return MDIN_I2C_ERROR;
+ 849   1        if (pCTL->err) return MDIN_NO_ERROR;
+ 850   1      
+ 851   1        // case of NExtensions = 1
+ 852   1        if (rNum==1) {
+ 853   2          if (MDINHTX_CheckHDMISignature(pCTL)) return MDIN_I2C_ERROR;
+ 854   2          if (pCTL->err) return MDIN_NO_ERROR;
+ 855   2          if (MDINHTX_SetNativeModeBy861B(pCTL)) return MDIN_I2C_ERROR;
+ 856   2          if (MDINHTX_SetNativeFrmtByVID(pCTL)) return MDIN_I2C_ERROR;
+ 857   2          pCTL->type = HTX_DISPLAY_HDMI;
+ 858   2        #if __MDINHTX_DBGPRT__ == 1
+                  Printf("************************ HDMI Mode!\n\r");
+                #endif
+ 861   2          return MDIN_NO_ERROR;
+ 862   2        }
+ 863   1      
+ 864   1        // case of NExtensions > 1
+ 865   1        if (MDINHTX_ReadEDID(0x80, &rVal, 1)) return MDIN_I2C_ERROR;
+ 866   1        if (rVal!=0xf0) pCTL->err = EDID_MAP_NOBLOCK;
+ 867   1        if (pCTL->err) return MDIN_NO_ERROR;
+ 868   1      
+ 869   1        while (rNum--) {  rAddr++;
+ 870   2          if (MDINHIF_RegField(MDIN_HDMI_ID, 0xee, 0, 8, rAddr)) return MDIN_I2C_ERROR;
+ 871   2      
+ 872   2          if (MDINHTX_ReadEDID(0x00, &rVal, 1)) return MDIN_I2C_ERROR;
+ 873   2          if ((rVal&0x02)==0) continue;
+ 874   2      
+ 875   2          if (MDINHTX_Check1stCRC(pCTL)) return MDIN_I2C_ERROR;
+ 876   2          if (pCTL->err) break;
+ 877   2      
+ 878   2          SetPAGE = 1;
+ 879   2          if (MDINHTX_CheckHDMISignature(pCTL)) return MDIN_I2C_ERROR;
+ 880   2          if (pCTL->err) break;
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 16  
+
+ 881   2      
+ 882   2          pCTL->type = HTX_DISPLAY_HDMI;
+ 883   2      //    if (MDINHTX_SetNativeModeBy861B(pCTL)) return MDIN_I2C_ERROR;
+ 884   2          if (MDINHTX_SetNativeFrmtByVID(pCTL)) return MDIN_I2C_ERROR;
+ 885   2      
+ 886   2          SetPAGE = 0;
+ 887   2          if (MDINHTX_Check2ndCRC(pCTL)) return MDIN_I2C_ERROR;
+ 888   2          if (pCTL->err) break;
+ 889   2      
+ 890   2          if (MDINHTX_SetNativeModeBy861B(pCTL)) return MDIN_I2C_ERROR;
+ 891   2          if (MDINHTX_SetNativeFrmtByVID(pCTL)) return MDIN_I2C_ERROR;
+ 892   2          if (pCTL->type==HTX_DISPLAY_HDMI) break;
+ 893   2        }
+ 894   1      
+ 895   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0xee, 0, 8, 0x00)) return MDIN_I2C_ERROR;
+ 896   1        return MDIN_NO_ERROR;
+ 897   1      }
+ 898          
+ 899          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 900          static MDIN_ERROR_t MDINHTX_GetParseEDID(PMDIN_VIDEO_INFO pINFO)
+ 901          {
+ 902   1        PMDIN_HTXVIDEO_INFO pVID = (PMDIN_HTXVIDEO_INFO)&pINFO->stVID_h;
+ 903   1        PMDIN_HDMICTRL_INFO pCTL = (PMDIN_HDMICTRL_INFO)&pINFO->stCTL_h;
+ 904   1      
+ 905   1      #if __MDINHTX_DBGPRT__ == 1
+                Printf("========== Parse EDID (1st) ============\n\r");
+              #endif
+ 908   1        
+ 909   1        GetMDDC = MDIN_NO_ERROR;  // clear MDDC error
+ 910   1        if (MDINHTX_ParseEDID(pCTL)) return MDIN_I2C_ERROR;
+ 911   1      
+ 912   1      #if __MDINHTX_DBGPRT__ == 1
+                if (pCTL->err) Printf("EDID Error %02x \n\r", pCTL->err);
+              #endif
+ 915   1      
+ 916   1        if (GetMDDC==MDIN_DDC_ACK_ERROR) {
+ 917   2      #if SYSTEM_USE_HTX_HDCP == 1
+                  if (MDINHTX_EnableEncryption(OFF)) return MDIN_I2C_ERROR;
+                  pCTL->auth = HDCP_REAUTH_REQ; // force re-authentication
+              #endif
+ 921   2        }
+ 922   1      
+ 923   1        // increase EDID read count
+ 924   1        GetEDID += (pCTL->err==MDIN_NO_ERROR)? -GetEDID : 1;
+ 925   1      
+ 926   1        // EDID error, or not supported version
+ 927   1        if (pCTL->err>=8) pCTL->proc = HTX_CABLE_DVI_OUT;
+ 928   1        if (pCTL->err!=0) return MDIN_NO_ERROR;
+ 929   1      
+ 930   1        if (pCTL->type==HTX_DISPLAY_HDMI) pCTL->proc = HTX_CABLE_HDMI_OUT;
+ 931   1        else                pCTL->proc = HTX_CABLE_DVI_OUT;
+ 932   1      
+ 933   1        if (pVID->fine&HDMI_USE_FORCE_DVI)  pCTL->proc = HTX_CABLE_DVI_OUT;
+ 934   1        return MDIN_NO_ERROR;
+ 935   1      }
+ 936          
+ 937          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 938          // Drive Function for InfoFrame (AVI, AUD, CP)
+ 939          //--------------------------------------------------------------------------------------------------------
+             -------------------
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 17  
+
+ 940          static MDIN_ERROR_t MDINHTX_GetControlPKTOff(void)
+ 941          {
+ 942   1        WORD rVal = 0x0800, count = 100;
+ 943   1      
+ 944   1        while (count&&(rVal==0x0800)) {
+ 945   2          if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x13e, &rVal)) return MDIN_I2C_ERROR;
+ 946   2      //    rVal &= 0x0800; count--;  MDINDLY_10uSec(5);  // delay 50us
+ 947   2          rVal &= 0x0800; count--;  MDINDLY_mSec(1);  // delay 1ms
+ 948   2        }
+ 949   1      
+ 950   1      #if __MDINHTX_DBGPRT__ == 1
+                Printf("(Disable CP) val=0x%02X, count=%d\n\r", rVal, count);
+              #endif
+ 953   1      
+ 954   1        return (count)? MDIN_NO_ERROR : MDIN_TIMEOUT_ERROR;
+ 955   1      }
+ 956          
+ 957          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 958          static MDIN_ERROR_t MDINHTX_EnableControlPKT(BOOL OnOff)
+ 959          {
+ 960   1        MDIN_ERROR_t err; WORD rVal;
+ 961   1      
+ 962   1        if (GetHDMI==FALSE) return MDIN_NO_ERROR; // check sink is HDMI
+ 963   1      
+ 964   1        if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x1de, &rVal)) return MDIN_I2C_ERROR;
+ 965   1        if ( OnOff&&(HIBYTE(rVal)==0x01)) return MDIN_NO_ERROR; // already mute set
+ 966   1        if (!OnOff&&(HIBYTE(rVal)==0x10)) return MDIN_NO_ERROR; // already mute clear
+ 967   1      
+ 968   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x13e, 10, 2, 0)) return MDIN_I2C_ERROR;
+ 969   1      
+ 970   1        err = MDINHTX_GetControlPKTOff(); if (err==MDIN_I2C_ERROR) return err;
+ 971   1        if (err==MDIN_TIMEOUT_ERROR) return MDIN_NO_ERROR;
+ 972   1      
+ 973   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x1de, 8, 8, (OnOff)? 0x01 : 0x10)) return MDIN_I2C_ERROR;
+ 974   1      
+ 975   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x13e, 10, 2, 3)) return MDIN_I2C_ERROR;
+ 976   1      
+ 977   1        if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x13e, &rVal)) return MDIN_I2C_ERROR;
+ 978   1        return MDIN_NO_ERROR;
+ 979   1      }
+ 980          
+ 981          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 982          static MDIN_ERROR_t MDINHTX_GetInfoFrameOff(BYTE mask)
+ 983          {
+ 984   1        WORD rVal = mask, count = 100;
+ 985   1      
+ 986   1        while (count&&(rVal==mask)) {
+ 987   2          if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x13e, &rVal)) return MDIN_I2C_ERROR;
+ 988   2          rVal &= mask; count--;  MDINDLY_mSec(1);  // delay 1ms
+ 989   2        }
+ 990   1      
+ 991   1      #if __MDINHTX_DBGPRT__ == 1
+                Printf("(Disable InfoFrame) val=0x%02X, count=%d\n\r", rVal, count);
+                if (count==0) Printf(" Disable InfoFrame Error!!!\n\r");
+              #endif
+ 995   1      
+ 996   1        return (count)? MDIN_NO_ERROR : MDIN_TIMEOUT_ERROR;
+ 997   1      }
+ 998          
+ 999          //--------------------------------------------------------------------------------------------------------
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 18  
+
+             -------------------
+1000          static MDIN_ERROR_t MDINHTX_SetInfoFrameAVI(PMDIN_VIDEO_INFO pINFO, BOOL OnOff)
+1001          {
+1002   1        BYTE i, mode, len, CRC; WORD rBuff[7];
+1003   1      
+1004   1        if (OnOff==OFF) return MDIN_NO_ERROR;
+1005   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x13e, 0, 1, 0)) return MDIN_I2C_ERROR;
+1006   1        if (MDINHTX_GetInfoFrameOff(0x02)) return MDIN_I2C_ERROR;
+1007   1      
+1008   1        memset(rBuff, 0, sizeof(rBuff));  // clear infoframe buff
+1009   1      
+1010   1        // colorimetry information
+1011   1        mode = defMDINHTXVideo[pINFO->stOUT_m.frmt].stMODE.id_1;
+1012   1        rBuff[0] |= (mode== 4||mode== 5||mode==16||mode==19||mode==20||mode==31||
+1013   1               mode==32||mode==33||mode==34)? (2<<14) : (1<<14);
+1014   1        if (pINFO->stVID_h.mode==HDMI_OUT_RGB444_8) rBuff[0] &= ~(3<<14);
+1015   1      
+1016   1        // picture aspect ratio information
+1017   1        mode = defMDINHTXVideo[pINFO->stOUT_m.frmt].stMODE.repl;
+1018   1        rBuff[0] |= (HI4BIT(mode)==2)? (2<<12) : (1<<12);
+1019   1      
+1020   1        // active format aspect ratio information
+1021   1        rBuff[0] |= (8<<8); 
+1022   1      
+1023   1        // color space information
+1024   1        if    (pINFO->stVID_h.mode==HDMI_OUT_RGB444_8) rBuff[0] |= (0<<5);
+1025   1        else if (pINFO->stVID_h.mode==HDMI_OUT_YUV444_8) rBuff[0] |= (2<<5);
+1026   1        else                       rBuff[0] |= (1<<5);
+1027   1      
+1028   1        // over/under scan information
+1029   1        mode = defMDINHTXVideo[pINFO->stOUT_m.frmt].stMODE.id_1;
+1030   1        rBuff[0] |= ((mode>1)&&(mode<60))? 1 : 2; // VGA start is 60
+1031   1      
+1032   1        // video identification information
+1033   1      //  rBuff[1] |= defMDINHTXVideo[pINFO->stOUT_m.frmt].stMODE.id_1<<8;
+1034   1        if (pINFO->dacPATH==DAC_PATH_AUX_4CH||pINFO->dacPATH==DAC_PATH_AUX_2HD)  //for HDMI VIC when 4D1/2HD  //by
+             - hungry 2012.08.23
+1035   1          rBuff[1] |= defMDINHTXVideo[pINFO->stOUT_x.frmt].stMODE.id_1<<8;
+1036   1        else
+1037   1          rBuff[1] |= defMDINHTXVideo[pINFO->stOUT_m.frmt].stMODE.id_1<<8;
+1038   1      
+1039   1        // pixel repetition, 28Dec2011
+1040   1        mode = defMDINHTXVideo[pINFO->stOUT_m.frmt].stMODE.repl;
+1041   1        rBuff[2] |= LO4BIT(mode);   // 28Dec2011
+1042   1      
+1043   1        len = sizeof(rBuff)-1;  CRC = 0x82 + 0x02 + len;  // because 1-byte dummy
+1044   1        for (i=0; i<sizeof(rBuff); i++) CRC += ((PBYTE)rBuff)[i];
+1045   1      
+1046   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x140, MAKEWORD(0x02,0x82))) return MDIN_I2C_ERROR;
+1047   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x142, MAKEWORD(0x100-CRC,len))) return MDIN_I2C_ERROR;
+1048   1        if (MDINHIF_MultiWrite(MDIN_HDMI_ID, 0x144, (PBYTE)rBuff, len+1)) return MDIN_I2C_ERROR;
+1049   1      
+1050   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x13e, 0, 2, 3)) return MDIN_I2C_ERROR;
+1051   1        return MDIN_NO_ERROR;
+1052   1      }
+1053          
+1054          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1055          static MDIN_ERROR_t MDINHTX_EnableInfoFrmAVI(PMDIN_VIDEO_INFO pINFO, BOOL OnOff)
+1056          {
+1057   1        WORD rVal;
+1058   1      
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 19  
+
+1059   1        if (MDINHTX_SetInfoFrameAVI(pINFO, OnOff)) return MDIN_I2C_ERROR;
+1060   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x13e, 0, 2, (OnOff)? 3 : 0)) return MDIN_I2C_ERROR;
+1061   1      
+1062   1        if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x13e, &rVal)) return MDIN_I2C_ERROR;
+1063   1        return MDIN_NO_ERROR;
+1064   1      }
+1065          
+1066          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1067          static MDIN_ERROR_t MDINHTX_SetInfoFrameAUD(PMDIN_VIDEO_INFO pINFO, BOOL OnOff)
+1068          {
+1069   1        BYTE i, len, CRC; WORD rBuff[5];
+1070   1      
+1071   1        if (OnOff==OFF) return MDIN_NO_ERROR;
+1072   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x13e, 4, 1, 0)) return MDIN_I2C_ERROR;
+1073   1        if (MDINHTX_GetInfoFrameOff(0x20)) return MDIN_I2C_ERROR;
+1074   1      
+1075   1        memset(rBuff, 0, sizeof(rBuff));  // clear infoframe buff
+1076   1      
+1077   1        // audio channel count information
+1078   1        if (pINFO->stAUD_h.fine&AUDIO_MULTI_CHANNEL) rBuff[0] |= 6;
+1079   1      
+1080   1        len = sizeof(rBuff);  CRC = 0x84 + 0x01 + len;
+1081   1        for (i=0; i<sizeof(rBuff); i++) CRC += ((PBYTE)rBuff)[i];
+1082   1      
+1083   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x180, MAKEWORD(0x01,0x84))) return MDIN_I2C_ERROR;
+1084   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x182, MAKEWORD(0x100-CRC,len))) return MDIN_I2C_ERROR;
+1085   1        if (MDINHIF_MultiWrite(MDIN_HDMI_ID, 0x184, (PBYTE)rBuff, len+0)) return MDIN_I2C_ERROR;
+1086   1      
+1087   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x13e, 4, 2, 3)) return MDIN_I2C_ERROR;
+1088   1        return MDIN_NO_ERROR;
+1089   1      }
+1090          
+1091          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1092          static MDIN_ERROR_t MDINHTX_EnableInfoFrmAUD(PMDIN_VIDEO_INFO pINFO, BOOL OnOff)
+1093          {
+1094   1        WORD rVal;
+1095   1      
+1096   1        if (MDINHTX_SetInfoFrameAUD(pINFO, OnOff)) return MDIN_I2C_ERROR;
+1097   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x13e, 4, 2, (OnOff)? 3 : 0)) return MDIN_I2C_ERROR;
+1098   1      
+1099   1        if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x13e, &rVal)) return MDIN_I2C_ERROR;
+1100   1        return MDIN_NO_ERROR;
+1101   1      }
+1102          /*
+1103          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1104          void SendGamutVerticesPacket(PBYTE data)
+1105          {
+1106            BYTE RegVal;
+1107            WORD writeCnt, sourceCnt; PWORD sourcePtr;
+1108            BYTE writeData[18], writeAddr;  PBYTE destPtr;
+1109            SHORT colorBitLength, sourceLeftBitCnt, destLeftBitCnt;
+1110          
+1111          #if __MDINHTX_DBGPRT__ == 1
+1112            UARTprintf("[]SendGamutVerticesPacket is called. \n\r");
+1113          #endif
+1114          
+1115            // Send Gamut Metadata packets only if in HDMI mode
+1116            if (GetHDMI==FALSE) return MDIN_NO_ERROR; // check sink is HDMI
+1117          
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 20  
+
+1118            writeData[0] = 0x0A;
+1119            writeData[1] = 0x00|(data[1]&0x0F);
+1120            if (data[2]&0x20) writeData[1] |= 0x80;
+1121            writeData[2] = ((data[1]>>4)&0x0F)|(0x03<<4);
+1122            writeData[3] = (data[2]&0x1F)|0x00;
+1123          
+1124            if ((data[3]&0x18)==0x00)   colorBitLength = 8;
+1125            else if ((data[3]&0x18)==0x08)  colorBitLength = 10;
+1126            else              colorBitLength = 12;
+1127          
+1128            writeData[4] = 0;  // Number_Vertices(high)
+1129            writeData[5] = 4;  // Number_Vertices(low)
+1130          
+1131            destPtr = (PBYTE)&writeData[6];
+1132            sourcePtr = (PWORD)&(data[4]);
+1133            destLeftBitCnt = 8;
+1134          
+1135            for (sourceCnt=0; sourceCnt<12; sourceCnt++) {
+1136              WORD sourceData = *sourcePtr;
+1137              sourceLeftBitCnt = colorBitLength;
+1138              sourceData &= 0x0FFF;
+1139              while (sourceLeftBitCnt>0) {
+1140                if (sourceLeftBitCnt>=destLeftBitCnt) {
+1141                  *destPtr = (BYTE)(sourceData>>(sourceLeftBitCnt-destLeftBitCnt));
+1142                  sourceLeftBitCnt -= destLeftBitCnt;
+1143                  destLeftBitCnt = 8;
+1144                }
+1145                  else {
+1146                  *destPtr += (BYTE)(sourceData<<(destLeftBitCnt-sourceLeftBitCnt));
+1147                  destLeftBitCnt -= sourceLeftBitCnt;
+1148                  sourceLeftBitCnt = 0;
+1149                  }
+1150                destPtr++;
+1151              }
+1152              sourcePtr++;
+1153            }
+1154          
+1155            WriteByteHDMITXP0(0xff, 0x01);
+1156            writeAddr = 0x00;
+1157            for (writeCnt=0; writeCnt<sizeof(writeData); writeCnt++) {
+1158              WriteByteHDMITXP0(writeAddr, writeData[writeCnt]);
+1159              writeAddr++;
+1160            }
+1161            WriteByteHDMITXP0(0xff, 0x00);
+1162          
+1163            RegVal = ReadByteHDMITXP1(0x3f);
+1164          #if __MDINHTX_DBGPRT__ == 1
+1165            UARTprintf("(Send GamutVerticesPacket)Read INF_CTRL2 %x\n\r", RegVal);
+1166          #endif
+1167            RegVal |= 0x40;
+1168            RegVal |= 0x80;
+1169            WriteByteHDMITXP1(0x3f, RegVal);
+1170          
+1171          #if __MDINHTX_DBGPRT__ == 1
+1172            RegVal = ReadByteHDMITXP1(0x3f);
+1173            UARTprintf("(Send GamutVerticesPacket)Read INF_CTRL2 after set %x\n\r", RegVal);
+1174          #endif
+1175          }
+1176          }
+1177          
+1178          //--------------------------------------------------------------------------------------------------------
+             -------------------
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 21  
+
+1179          void SendGamutRangePacket(PBYTE data)
+1180          {
+1181            BYTE RegVal;
+1182            WORD writeCnt, sourceCnt; PWORD sourcePtr;
+1183            BYTE writeData[13], writeAddr;  PBYTE destPtr;
+1184            SHORT colorBitLength, sourceLeftBitCnt, destLeftBitCnt;
+1185          
+1186          #if __MDINHTX_DBGPRT__ == 1
+1187            UARTprintf("[]SendGamutRangePacket is called. \n\r");
+1188          #endif
+1189          
+1190            // Send Gamut Metadata packets only if in HDMI mode
+1191            if (GetHDMI==FALSE) return; // check sink is HDMI
+1192          
+1193            writeData[0] = 0x0A;
+1194            writeData[1] = 0x00|(data[1]&0x0F);
+1195            if (data[2]&0x20) writeData[1] |= 0x80;
+1196            writeData[2] = ((data[1]>>4)&0x0F)|(0x03<<4);
+1197            writeData[3] = (data[2]&0x1F)|0x80;
+1198          
+1199            if ((data[3]&0x18)==0x00)   colorBitLength = 8;
+1200            else if ((data[3]&0x18)==0x08)  colorBitLength = 10;
+1201            else              colorBitLength = 12;
+1202          
+1203            destPtr = (PBYTE)&writeData[4];
+1204            sourcePtr = (PWORD)&(data[4]);
+1205            destLeftBitCnt = 8;
+1206          
+1207            for (sourceCnt=0; sourceCnt<6; sourceCnt++) {
+1208              WORD sourceData = *sourcePtr;
+1209              sourceLeftBitCnt = colorBitLength;
+1210              sourceData &= 0x0FFF;
+1211              while (sourceLeftBitCnt>0) {
+1212                if (sourceLeftBitCnt>=destLeftBitCnt) {
+1213                  *destPtr = (BYTE)(sourceData>>(sourceLeftBitCnt-destLeftBitCnt));
+1214                  sourceLeftBitCnt -= destLeftBitCnt;
+1215                  destLeftBitCnt = 8;
+1216                }
+1217                else {
+1218                  *destPtr += (BYTE)(sourceData<<(destLeftBitCnt-sourceLeftBitCnt));
+1219                  destLeftBitCnt -= sourceLeftBitCnt;
+1220                  sourceLeftBitCnt = 0;
+1221                }
+1222                destPtr++;
+1223              }
+1224              sourcePtr++;
+1225            }
+1226          
+1227            WriteByteHDMITXP0(0xff, 0x01);
+1228            writeAddr = 0x00;
+1229            for (writeCnt=0; writeCnt<sizeof(writeData); writeCnt++) {
+1230              WriteByteHDMITXP0(writeAddr, writeData[writeCnt]);
+1231              writeAddr++;
+1232            }
+1233          
+1234            WriteByteHDMITXP0(0xff, 0x00);
+1235            RegVal = ReadByteHDMITXP1(0x3f);
+1236          #if __MDINHTX_DBGPRT__ == 1
+1237            UARTprintf("(Send GamutRangePacket)Read INF_CTRL2 %x\n\r", RegVal);
+1238          #endif
+1239            RegVal |= 0x40;
+1240            RegVal |= 0x80;
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 22  
+
+1241            WriteByteHDMITXP1(0x3f, RegVal);
+1242          }
+1243          
+1244          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1245          void EnableGamutPacket(void)
+1246          {
+1247            BYTE RegVal = ReadByteHDMITXP1(0x3f);
+1248            RegVal |= (0x40|0x80);
+1249            WriteByteHDMITXP1(0x3f, RegVal);
+1250          }
+1251          
+1252          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1253          void DisableGamutPacket(void)
+1254          {
+1255            BYTE RegVal = ReadByteHDMITXP1(0x3f);
+1256            RegVal &= ~(0x40|0x80);
+1257            WriteByteHDMITXP1(0x3f, RegVal);
+1258          }
+1259          
+1260          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1261          void SetxvYCCSetting(PBYTE data)
+1262          {
+1263            WriteByteHDMITXP0(0x50, 0x00);
+1264          
+1265            if (data[1]&0x01) {
+1266              if (data[1]&0x04) {
+1267                // "Override internal CSC coefficients" is enable.
+1268                SHORT writeCnt;
+1269                BYTE writeAddr = 0x51;
+1270                BYTE writeLowData, writeHighData;
+1271                WORD sourceData;
+1272                PWORD sourcePtr = (PWORD)&data[2];
+1273                // set CSC coefficients
+1274                for (writeCnt=0; writeCnt<9; writeCnt++) {
+1275                  sourceData = *sourcePtr;
+1276                  WriteWordHDMITXP0(writeAddr, sourceData);
+1277                  writeAddr += 2; sourcePtr++;
+1278                }
+1279                // set RGB Input Offset
+1280                sourceData = *sourcePtr; sourcePtr++;
+1281                WriteWordHDMITXP0(writeAddr, sourceData);
+1282                writeAddr+= 2; sourcePtr++;
+1283                // set Y Output Offset
+1284                sourceData = *sourcePtr; sourcePtr++;
+1285                writeLowData = (BYTE)(sourceData&0x7F); // low 7bits
+1286                writeHighData = (BYTE)((sourceData>>7)&0x7F); // high 7bits
+1287                WriteByteHDMITXP0(writeAddr, writeLowData);
+1288                writeAddr++;
+1289                WriteByteHDMITXP0(writeAddr, writeHighData);
+1290                writeAddr++;
+1291          
+1292                // set CbCr Output Offset
+1293                sourceData = *sourcePtr; sourcePtr++;
+1294                writeLowData = (BYTE)(sourceData&0x7F); // low 7bits
+1295                writeHighData = (BYTE)((sourceData>>7)&0x7F); // high 7bits
+1296                WriteByteHDMITXP0(writeAddr, writeLowData);
+1297                writeAddr++;
+1298                WriteByteHDMITXP0(writeAddr, writeHighData);
+1299                writeAddr++;
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 23  
+
+1300              }
+1301              WriteByteHDMITXP0(0x50 , data[1]);
+1302            }
+1303            else{
+1304              // xvYCC conversion function is disable.
+1305              WriteByteHDMITXP0(0x50 , data[1]);
+1306            }
+1307          }
+1308          */
+1309          #if SYSTEM_USE_HTX_HDCP == 1
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              // Drive Function for HDCP-Auth Handler
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static void MDINHTX_ShowInfoRiFailure(BYTE info)
+              {
+              #if __MDINHTX_DBGPRT__ == 1
+                if    (info&0x10) UARTprintf("RI_READING_MORE_ONE_FRAME\n\r");
+                else if (info&0x80) UARTprintf("RI_MISS_MATCH_LAST_FRAME\n\r");
+                else if (info&0x40) UARTprintf("RI_MISS_MATCH_FIRST_FRAME\n\r");
+                else if (info&0x20) UARTprintf("MASK_RI_NOT_CHANGED\n\r");
+              
+                UARTprintf("Ri interrupt asserted %d times\n\r", ++GetFAIL);
+              #endif
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static void MDINHTX_ShowInfoAuthState(PMDIN_HDMICTRL_INFO pCTL)
+              {
+              #if __MDINHTX_DBGPRT__ == 1
+                if (OldAUTH==pCTL->auth||pCTL->auth==HDCP_AUTHEN_BGN) return;
+              
+                UARTprintf("{HDMI-Auth}: ");
+                switch (pCTL->auth) {
+                  case HDCP_NOT_DEVICE: UARTprintf("Sink is not HDCP\n\r"); break;
+                  case HDCP_BKSV_ERROR: UARTprintf("BKSV Error\n\r"); break;
+                  case HDCP_R0s_NOSAME: UARTprintf("R0 mis-match\n\r"); break;
+                  case HDCP_AUTHEN_END: UARTprintf("Authenticated\n\r"); break;
+                  case HDCP_REPEAT_REQ: UARTprintf("RPT-Auth. Req\n\r"); break;
+                  case HDCP_SHACAL_REQ: UARTprintf("SHA calc. Req\n\r"); break;
+                  case HDCP_VHx_NOSAME: UARTprintf("VHx Error\n\r"); break;
+                  case HDCP_CAS_EXCEED: UARTprintf("MAX_CASCADE_EXCEEDED\n\r"); break;
+                  case HDCP_MAX_EXCEED: UARTprintf("MAX_DEVS_EXCEEDED\n\r"); break;
+                  case HDCP_DEV_EXCEED: UARTprintf("NUM_DEVS_EXCEEDED\n\r"); break;
+                  case HDCP_REAUTH_REQ: UARTprintf("RE-Authen Req\n\r"); break;
+                  case HDCP_AUTHEN_REQ: UARTprintf("Authentication Req\n\r"); break;
+                  default:        UARTprintf("Unknown %02d\n\r", pCTL->auth); break;
+                }
+                OldAUTH = pCTL->auth;
+              #endif
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_WriteHDCPRX(WORD rAddr, PBYTE pBuff, BYTE bytes)
+              {
+                MDIN_HDMIMDDC_INFO stMDDC;
+              
+                stMDDC.sAddr    = MAKEWORD(0x74, 0);
+                stMDDC.rAddr    = MAKEWORD(rAddr,0);
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 24  
+
+                stMDDC.bytes    = bytes;
+                stMDDC.cmd      = 0x06;   // sequential write
+                stMDDC.pBuff    = pBuff;
+                return MDINHTX_WriteMDDC(&stMDDC);
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_ReadHDCPRX(WORD rAddr, PBYTE pBuff, BYTE bytes)
+              {
+                MDIN_HDMIMDDC_INFO stMDDC;
+              
+                stMDDC.sAddr    = MAKEWORD(0x74, 0);
+                stMDDC.rAddr    = MAKEWORD(rAddr,0);
+                stMDDC.bytes    = bytes;
+                stMDDC.cmd      = 0x02;   // sequential read
+                stMDDC.pBuff    = pBuff;
+                return MDINHTX_ReadMDDC(&stMDDC);
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_WriteHDCPTX(WORD rAddr, PBYTE pBuff, BYTE bytes)
+              {
+                if (MDINHIF_MultiWrite(MDIN_HDMI_ID, rAddr, pBuff, bytes)) return MDIN_I2C_ERROR;
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_ReadHDCPTX(WORD rAddr, PBYTE pBuff, BYTE bytes)
+              {
+                if (MDINHIF_MultiRead(MDIN_HDMI_ID, rAddr, pBuff, bytes)) return MDIN_I2C_ERROR;
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_SetKSVCmd(BYTE rAddr, WORD bytes)
+              {
+                MDIN_HDMIMDDC_INFO stMDDC;
+              
+                if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x0f2, 0x0f00)) return MDIN_I2C_ERROR; // ABORT
+                if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x0f2, 0x0900)) return MDIN_I2C_ERROR; // CLEAR
+              
+                stMDDC.sAddr    = MAKEWORD(0x74, 0);
+                stMDDC.rAddr    = MAKEWORD(rAddr,0);
+                stMDDC.bytes    = bytes;
+                stMDDC.cmd      = 0x02;   // sequential read
+              
+                if (MDINHIF_MultiWrite(MDIN_HDMI_ID, 0x0ec, (PBYTE)&stMDDC, 6)) return MDIN_I2C_ERROR;
+                if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x0f2, MAKEWORD(stMDDC.cmd,0))) return MDIN_I2C_ERROR;
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_GetFIFOCntDone(WORD bytes)
+              {
+                WORD rVal = 0, count = 500;
+              
+                while (count&&(rVal<bytes)) {
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 25  
+
+                  if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x0f5, &rVal)) return MDIN_I2C_ERROR;
+                  count--;  MDINDLY_mSec(1);  // delay 1ms
+                }
+              
+              #if __MDINHTX_DBGPRT__ == 1
+                if (count==0) UARTprintf("MDINHTX_GetFIFOCntDone %d BYTEs failed\n\r", bytes);
+              #endif
+              
+                return (count)? MDIN_NO_ERROR : MDIN_TIMEOUT_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_GetKSVFIFO(PBYTE pBuff, WORD bytes)
+              {
+                WORD i, rVal;
+              
+                if (MDINHTX_GetFIFOCntDone(bytes)) return MDIN_NO_ERROR;
+              
+                for (i=0; i<bytes; i++) {
+                  if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x0f4, &rVal)) return MDIN_I2C_ERROR;
+                  pBuff[i] = LOBYTE(rVal);
+                }
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_SetKSVFIFO(PBYTE pBuff, WORD bytes)
+              {
+                WORD i;
+              
+                for (i=0; i<bytes; i++) {
+                  if (MDINHIF_RegField(MDIN_HDMI_ID, 0x0cc, 8, 8, pBuff[i])) return MDIN_I2C_ERROR;
+                }
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_IsRXRepeater(void)
+              {
+                if (MDINHTX_ReadHDCPRX(0x040, &GetRPT, 1)) return MDIN_I2C_ERROR;
+                GetRPT = (GetRPT&0x40)? TRUE : FALSE;
+              
+              #if __MDINHTX_DBGPRT__ == 1
+                if (GetRPT) UARTprintf("It is Repeater!!\n\r");
+                else    UARTprintf("It is TV!!\n\r");
+              #endif
+              
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_AreR0sMatch(void)
+              {
+                WORD R0RX, R0TX;
+              
+                if (MDINHTX_ReadHDCPRX(0x008, (PBYTE)&R0RX, 2)) return MDIN_I2C_ERROR;
+                if (MDINHTX_ReadHDCPTX(0x022, (PBYTE)&R0TX, 2)) return MDIN_I2C_ERROR;
+              
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 26  
+
+              #if __MDINHTX_DBGPRT__ == 1
+                UARTprintf("R0RX = 0x%04X, R0TX = 0x%04X\n\r", R0RX, R0TX);
+              #endif
+              
+                GetSAME = (R0RX==R0TX)? TRUE : FALSE;
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_IsDeviceHDCP(void)
+              {
+                BYTE i, j, ones = 0, rBuff[5];
+              
+                // read BKSV from RX
+                if (MDINHTX_ReadHDCPRX(0x000, rBuff, 5)) return MDIN_I2C_ERROR;
+              
+                for (i=0; i<5; i++) {
+                  for (j=0; j<8; j++) {
+                    if (rBuff[i]&(1<<j)) ones++;
+                  }
+                }
+              
+                GetHDCP = (ones==20)? TRUE : FALSE;
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_EnableEncryption(BOOL OnOff)
+              {
+                if (MDINHIF_RegField(MDIN_HDMI_ID, 0x00e, 8, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_EnableKSVReady(BOOL OnOff)
+              {
+                if (MDINHIF_RegField(MDIN_HDMI_ID, 0x076, 7, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+                if (MDINHIF_RegField(MDIN_HDMI_ID, 0x026, 9, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+              
+                if (OnOff==OFF) return MDIN_NO_ERROR;
+                if (MDINHIF_RegField(MDIN_HDMI_ID, 0x026, 8, 1, ON)) return MDIN_I2C_ERROR;
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_KSVReadyHandler(PMDIN_HDMICTRL_INFO pCTL, BYTE info)
+              {
+                if (pCTL->auth!=HDCP_REPEAT_REQ||(info&0x80)==0) return MDIN_NO_ERROR;
+              
+                if (MDINHTX_EnableKSVReady(OFF)) return MDIN_I2C_ERROR;
+                pCTL->auth = HDCP_SHACAL_REQ;
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_EnableRISCheck(BOOL OnOff)
+              {
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 27  
+
+                if (MDINHIF_RegField(MDIN_HDMI_ID, 0x076, 12, 2, (OnOff)? 3 : 0)) return MDIN_I2C_ERROR;
+                if (MDINHIF_RegField(MDIN_HDMI_ID, 0x076, 15, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+                if (MDINHIF_RegField(MDIN_HDMI_ID, 0x026,  8, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_RISCheckHandler(PMDIN_HDMICTRL_INFO pCTL, BYTE info)
+              {
+                if (pCTL->auth==HDCP_AUTHEN_BGN||(info&0xb0)==0) return MDIN_NO_ERROR;
+              
+                if (MDINHTX_EnableRISCheck(OFF)) return MDIN_I2C_ERROR;
+                if (MDINHTX_EnableKSVReady(OFF)) return MDIN_I2C_ERROR;
+                if (MDINHTX_EnableEncryption(OFF)) return MDIN_I2C_ERROR;
+                MDINHTX_ShowInfoRiFailure(info);  // debug print
+              
+                pCTL->auth = HDCP_REAUTH_REQ;
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_SetHDCPAuthMode(PMDIN_HDMICTRL_INFO pCTL)
+              {
+                WORD rVal, wBuff[5];  BYTE i, rBuff[10];
+              
+                // Those check must not be enabled before 1st part of Authentication.
+                if (MDINHTX_EnableRISCheck(OFF)) return MDIN_I2C_ERROR;
+                if (MDINHTX_EnableKSVReady(OFF)) return MDIN_I2C_ERROR;
+              
+                if (MDINHTX_IsDeviceHDCP()) return MDIN_I2C_ERROR;
+                if (GetHDCP==0) {pCTL->auth = HDCP_NOT_DEVICE; return MDIN_NO_ERROR;}
+              
+                // CP reset is normal operation
+                if (MDINHIF_RegField(MDIN_HDMI_ID, 0x00e, 10, 1, 1)) return MDIN_I2C_ERROR;
+              
+                // set repeater of RX
+                if (MDINHTX_IsRXRepeater()) return MDIN_I2C_ERROR;
+                if (MDINHIF_RegField(MDIN_HDMI_ID, 0x00e, 12, 1, GetRPT)) return MDIN_I2C_ERROR;
+              
+                // generate AN
+                if (MDINHIF_RegField(MDIN_HDMI_ID, 0x00e, 11, 1, 0)) return MDIN_I2C_ERROR;
+                MDINDLY_mSec(10);
+                if (MDINHIF_RegField(MDIN_HDMI_ID, 0x00e, 11, 1, 1)) return MDIN_I2C_ERROR;
+              
+                // read AN from HDCPTX
+                if (MDINHTX_ReadHDCPTX(0x014, (PBYTE)wBuff, 10)) return MDIN_I2C_ERROR;
+                for (i=0; i<5; i++) { // conversion WORD-array to BYTE-array
+                  rBuff[i*2+0] = LOBYTE(wBuff[i]); rBuff[i*2+1] = HIBYTE(wBuff[i]);
+                }
+              
+                // write AN to HDCPRX
+                if (MDINHTX_WriteHDCPRX(0x018, rBuff+1, 8)) return MDIN_I2C_ERROR;
+              
+                // read AKSV from HDCPTX
+                if (MDINHTX_ReadHDCPTX(0x01c, (PBYTE)wBuff, 6)) return MDIN_I2C_ERROR;
+                for (i=0; i<3; i++) { // conversion WORD-array to BYTE-array
+                  rBuff[i*2+0] = LOBYTE(wBuff[i]); rBuff[i*2+1] = HIBYTE(wBuff[i]);
+                }
+              
+                // write AKSV to HDCPRX
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 28  
+
+                if (MDINHTX_WriteHDCPRX(0x010, rBuff+1, 5)) return MDIN_I2C_ERROR;
+              
+                // read BKSV from HDCPRX
+                if (MDINHTX_ReadHDCPRX(0x000, rBuff, 5)) return MDIN_I2C_ERROR;
+                for (i=0; i<3; i++) { // conversion BYTE-array to WORD-array
+                  wBuff[i] = MAKEWORD(rBuff[i*2+1], rBuff[i*2+0]);
+                }
+              
+                // Write BKSV to HDCPTX
+                if (MDINHTX_WriteHDCPTX(0x010, (PBYTE)wBuff, 4)) return MDIN_I2C_ERROR;
+                if (MDINHIF_RegField(MDIN_HDMI_ID, 0x014, 0, 8, rBuff[4])) return MDIN_I2C_ERROR;
+              
+                if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x00e, &rVal)) return MDIN_I2C_ERROR;
+                if (rVal&0x2000) {pCTL->auth = HDCP_BKSV_ERROR; return MDIN_NO_ERROR;}
+              
+                MDINDLY_mSec(200); // Delay for R0 calculation, Suppress R0 read before 100ms interval between BKSV write
+             - and R read
+              
+                if (MDINHTX_AreR0sMatch()) return MDIN_I2C_ERROR;
+                if (GetSAME==0) {pCTL->auth = HDCP_R0s_NOSAME; return MDIN_NO_ERROR;}
+              
+                // set RiCheck interrupt mask
+                if (MDINHIF_RegField(MDIN_HDMI_ID, 0x074, 10, 1, 1)) return MDIN_I2C_ERROR;
+              
+                if (MDINHTX_EnableControlPKT(OFF)) return MDIN_I2C_ERROR;
+                if (MDINHTX_EnableEncryption(ON)) return MDIN_I2C_ERROR;
+                if (MDINHTX_EnableRISCheck(ON)) return MDIN_I2C_ERROR;
+              
+                if (MDINHTX_IsRXRepeater()) return MDIN_I2C_ERROR;
+                if (GetRPT==0) {pCTL->auth = HDCP_AUTHEN_END; return MDIN_NO_ERROR;}
+              
+                if (MDINHTX_EnableKSVReady(ON)) return MDIN_I2C_ERROR;
+              
+                pCTL->auth = HDCP_REPEAT_REQ; GetFIFO = 5000; // set 5sec time out
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_HDCPAuthHandler(PMDIN_VIDEO_INFO pINFO)
+              {
+                PMDIN_HDMICTRL_INFO pCTL = (PMDIN_HDMICTRL_INFO)&pINFO->stCTL_h;
+              
+                if (pCTL->auth==HDCP_AUTHEN_BGN) return MDIN_NO_ERROR;
+              
+                MDINHTX_ShowInfoAuthState(pCTL);  // debug print
+              
+                if (pCTL->proc!=HTX_CABLE_HDMI_OUT&&
+                  pCTL->proc!=HTX_CABLE_DVI_OUT) return MDIN_NO_ERROR;
+              
+                if (pCTL->auth==HDCP_AUTHEN_END) return MDIN_NO_ERROR;
+                if (pCTL->auth==HDCP_SHACAL_REQ) return MDIN_NO_ERROR;
+              
+                if (pCTL->auth==HDCP_REPEAT_REQ) {
+                  if (GetFIFO) GetFIFO--; MDINDLY_mSec(1);
+                  if (GetFIFO) return MDIN_NO_ERROR;
+                }
+              
+              #if __MDINHTX_DBGPRT__ == 1
+                UARTprintf("ReAthentication begin!!!\n\r");
+              #endif
+              
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 29  
+
+                if (GetHDMI==FALSE) {   // check sink is HDMI
+                  if (MDINHTX_InitModeDVI(pINFO)) return MDIN_I2C_ERROR;
+              
+              #if __MDINHTX_DBGPRT__ == 1
+                  UARTprintf("[HDCP.C](ReAthentication): Call InitDVITX() #1\n\r");
+              #endif
+                }
+              
+                // Must turn encryption off when AVMUTE
+                if (MDINHTX_EnableEncryption(OFF)) return MDIN_I2C_ERROR;
+              
+                if (GetHDMI==FALSE) {   // check sink is HDMI
+                  if (MDINHTX_InitModeDVI(pINFO)) return MDIN_I2C_ERROR;
+              
+              #if __MDINHTX_DBGPRT__ == 1
+                  UARTprintf("[HDCP.C](ReAthentication): Call InitDVITX() #2\n\r");
+              #endif
+                }
+              
+                if (MDINHTX_SetHDCPAuthMode(pCTL)) return MDIN_I2C_ERROR;
+                MDINHTX_ShowInfoAuthState(pCTL);  // debug print
+              
+                if (pCTL->auth==HDCP_AUTHEN_END) return MDIN_NO_ERROR;
+                if (pCTL->auth==HDCP_REPEAT_REQ) return MDIN_NO_ERROR;
+              
+              #if __MDINHTX_DBGPRT__ == 1
+                UARTprintf("Authentication is failure. ReAuthentication.\n\r");
+              #endif
+              
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              // Drive Function for HDCP-SHA Handler
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_GetSHAProcDone(void)
+              {
+                WORD rVal = 0, count = 100;
+              
+                while (count&&(rVal==0x00)) {
+                  if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x0cc, &rVal)) return MDIN_I2C_ERROR;
+                  rVal &= 0x01; count--;  MDINDLY_10uSec(10);   // delay 100us
+                }
+                if (count) MDINDLY_mSec(1);   // delay 1ms
+              
+              #if __MDINHTX_DBGPRT__ == 1
+                if (count==0) UARTprintf("MDINHTX_GetSHAProcDone() TimeOut Error!!!\n\r");
+              #endif
+              
+                return (count)? MDIN_NO_ERROR : MDIN_TIMEOUT_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_SHATransform(BYTE num)
+              {
+                BYTE i, rBuff[5]; WORD bytes = num*5;
+              
+                // set KSV length
+                if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x0ca, bytes)) return MDIN_I2C_ERROR;
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 30  
+
+              
+                // clear SHA_GONE
+                if (MDINHIF_RegField(MDIN_HDMI_ID, 0x0cc, 0, 8, 0x0a)) return MDIN_I2C_ERROR;
+              
+                // set SHA_START 
+                if (MDINHIF_RegField(MDIN_HDMI_ID, 0x0cc, 0, 8, 0x09)) return MDIN_I2C_ERROR;
+              
+                // get KSV list from HDCPRX & set KSV FIFO to HDCPTX
+                if (MDINHTX_SetKSVCmd(0x43, bytes)) return MDIN_I2C_ERROR;
+              
+                for (i=0; i<num; i++) {
+                  if (MDINHTX_GetKSVFIFO(rBuff, 5)) return MDIN_I2C_ERROR;
+                  if (MDINHTX_SetKSVFIFO(rBuff, 5)) return MDIN_I2C_ERROR;
+                }
+              
+                return MDINHTX_GetSHAProcDone();
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_SHACompareVi(void)
+              {
+                BYTE i, j, rBuff[4], vBuff[4];
+              
+                if (MDINHTX_SetKSVCmd(0x20, 20)) return MDIN_I2C_ERROR;
+              
+                for (i=0; i<5; i++) {
+                  if (MDINHTX_GetKSVFIFO(rBuff, 4)) return MDIN_I2C_ERROR;
+                  if (MDINHTX_ReadHDCPTX(0x0d8+i*4, vBuff, 4)) return MDIN_I2C_ERROR;
+              
+                  for (j=0; j<4; j++) {
+                    if (rBuff[j]!=vBuff[j]) return MDIN_SHA_CMP_ERROR;
+                  }
+                }
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINHTX_HDCPSHAHandler(PMDIN_VIDEO_INFO pINFO)
+              {
+                PMDIN_HDMICTRL_INFO pCTL = (PMDIN_HDMICTRL_INFO)&pINFO->stCTL_h;
+                MDIN_ERROR_t err; BYTE rBuff[2];  WORD wBuff[2];
+              
+                if (pCTL->auth!=HDCP_SHACAL_REQ) return MDIN_NO_ERROR;
+              
+                if (MDINHTX_ReadHDCPRX(0x041, rBuff, 2)) return MDIN_I2C_ERROR;
+                wBuff[0] = MAKEWORD(rBuff[1], rBuff[2]);
+                if (MDINHTX_WriteHDCPTX(0x0ce, (PBYTE)wBuff, 2)) return MDIN_I2C_ERROR;
+              
+                if (rBuff[1]&0x08) {
+                  pCTL->auth = HDCP_CAS_EXCEED;
+                  if (MDINHTX_EnableRISCheck(OFF)) return MDIN_I2C_ERROR;
+                  if (MDINHTX_EnableKSVReady(OFF)) return MDIN_I2C_ERROR;
+                  if (MDINHTX_EnableEncryption(OFF)) return MDIN_I2C_ERROR;
+                  MDINDLY_mSec(100); // To suppress 1st part auth start before RiCheck stop
+                  return MDIN_NO_ERROR;
+                }
+                if (rBuff[0]&0x80) {
+                  pCTL->auth = HDCP_MAX_EXCEED;
+                  if (MDINHTX_EnableRISCheck(OFF)) return MDIN_I2C_ERROR;
+                  if (MDINHTX_EnableKSVReady(OFF)) return MDIN_I2C_ERROR;
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 31  
+
+                  if (MDINHTX_EnableEncryption(OFF)) return MDIN_I2C_ERROR;
+                  MDINDLY_mSec(100); // To suppress 1st part auth start before RiCheck stop
+                  return MDIN_NO_ERROR;
+                }
+                if (rBuff[0]>12) {
+                  pCTL->auth = HDCP_DEV_EXCEED;
+                  if (MDINHTX_EnableRISCheck(OFF)) return MDIN_I2C_ERROR;
+                  if (MDINHTX_EnableKSVReady(OFF)) return MDIN_I2C_ERROR;
+                  if (MDINHTX_EnableEncryption(OFF)) return MDIN_I2C_ERROR;
+                  MDINDLY_mSec(100); // To suppress 1st part auth start before RiCheck stop
+                  return MDIN_NO_ERROR;
+                }
+              
+                err = MDINHTX_SHATransform(rBuff[0]); if (err==MDIN_I2C_ERROR) return err;
+                if (err==MDIN_TIMEOUT_ERROR) {
+                  pCTL->auth = HDCP_FIFO_ERROR;
+                  if (MDINHTX_EnableRISCheck(OFF)) return MDIN_I2C_ERROR;
+                  if (MDINHTX_EnableKSVReady(OFF)) return MDIN_I2C_ERROR;
+                  if (MDINHTX_EnableEncryption(OFF)) return MDIN_I2C_ERROR;
+                  MDINDLY_mSec(100); // To suppress 1st part auth start before RiCheck stop
+                  return MDIN_NO_ERROR;
+                }
+              
+                err = MDINHTX_SHACompareVi(); if (err==MDIN_I2C_ERROR) return err;
+                if (err==MDIN_SHA_CMP_ERROR) {
+                  pCTL->auth = HDCP_VHx_NOSAME;
+                  if (MDINHTX_EnableRISCheck(OFF)) return MDIN_I2C_ERROR;
+                  if (MDINHTX_EnableKSVReady(OFF)) return MDIN_I2C_ERROR;
+                  if (MDINHTX_EnableEncryption(OFF)) return MDIN_I2C_ERROR;
+                  MDINDLY_mSec(100); // To suppress 1st part auth start before RiCheck stop
+                  return MDIN_NO_ERROR;
+                }
+              
+                pCTL->auth = HDCP_AUTHEN_END;
+                if (MDINHTX_EnableRISCheck(ON)) return MDIN_I2C_ERROR;
+                return MDIN_NO_ERROR;
+              }
+              #endif  /* SYSTEM_USE_HTX_HDCP == 1 */
+1807          
+1808          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1809          // Drive Function for ETC (reset, video, audio, etc)
+1810          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1811          static MDIN_ERROR_t MDINHTX_SetModeHDMI(BOOL OnOff)
+1812          {
+1813   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x12e, 8, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+1814   1        GetHDMI = MBIT(OnOff,1);
+1815   1        return MDIN_NO_ERROR;
+1816   1      }
+1817          
+1818          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1819          static BOOL     MDINHTX_IsModeHDMI(void)
+1820          {
+1821   1        return (GetHDMI)? TRUE : FALSE;
+1822   1      }
+1823          
+1824          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1825          static MDIN_ERROR_t MDINHTX_Set656Mode(BYTE mode)
+1826          {
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 32  
+
+1827   1        WORD rVal = defMDINHTXVideo[mode].stB656.i_adj;
+1828   1      
+1829   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x03e, 0, 8, LOBYTE(rVal))) return MDIN_I2C_ERROR;
+1830   1      
+1831   1        rVal = defMDINHTXVideo[mode].stB656.h_syn;
+1832   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x040, rVal)) return MDIN_I2C_ERROR;
+1833   1      
+1834   1        rVal = defMDINHTXVideo[mode].stB656.o_fid;
+1835   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x042, rVal)) return MDIN_I2C_ERROR;
+1836   1      
+1837   1        rVal = defMDINHTXVideo[mode].stB656.h_len;
+1838   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x044, rVal)) return MDIN_I2C_ERROR;
+1839   1      
+1840   1        rVal = defMDINHTXVideo[mode].stB656.v_syn;
+1841   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x046, 0, 8, LOBYTE(rVal))) return MDIN_I2C_ERROR;
+1842   1      
+1843   1        rVal = defMDINHTXVideo[mode].stB656.v_len;
+1844   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x046, 8, 8, LOBYTE(rVal))) return MDIN_I2C_ERROR;
+1845   1      
+1846   1        rVal = defMDINHTXVideo[mode].stWIND.x;
+1847   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x032, 0, 12, rVal)) return MDIN_I2C_ERROR;
+1848   1      
+1849   1        rVal = defMDINHTXVideo[mode].stWIND.y;
+1850   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x034, rVal)) return MDIN_I2C_ERROR;
+1851   1      
+1852   1        rVal = defMDINHTXVideo[mode].stWIND.w;
+1853   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x036, rVal)) return MDIN_I2C_ERROR;
+1854   1      
+1855   1        rVal = defMDINHTXVideo[mode].stWIND.h;
+1856   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x038, rVal)) return MDIN_I2C_ERROR;
+1857   1        return MDIN_NO_ERROR;
+1858   1      }
+1859          
+1860          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1861          static MDIN_ERROR_t MDINHTX_EnableAllPWR(PMDIN_VIDEO_INFO pINFO, BOOL OnOff)
+1862          {
+1863   1        PMDIN_HDMICTRL_INFO pCTL = (PMDIN_HDMICTRL_INFO)&pINFO->stCTL_h;
+1864   1      
+1865   1        // set power down total
+1866   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x13c, 8, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+1867   1      
+1868   1        // disable Ri check
+1869   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x076, 12, 2, 0)) return MDIN_I2C_ERROR;
+1870   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x076, 15, 1, 0)) return MDIN_I2C_ERROR;
+1871   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x026,  8, 1, 0)) return MDIN_I2C_ERROR;
+1872   1      
+1873   1        // disable KSV ready
+1874   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x076, 7, 1, 0)) return MDIN_I2C_ERROR;
+1875   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x026, 9, 1, 0)) return MDIN_I2C_ERROR;
+1876   1      
+1877   1        // disable encryption
+1878   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x00e, 8, 1, 0)) return MDIN_I2C_ERROR;
+1879   1      
+1880   1        if (OnOff==OFF) pCTL->proc = HTX_CABLE_PLUG_OUT;
+1881   1        if (OnOff==OFF) pCTL->auth = HDCP_AUTHEN_BGN;
+1882   1      
+1883   1      #if SYSTEM_USE_HTX_HDCP == 1
+                if (OnOff==ON)  pCTL->auth = HDCP_REAUTH_REQ;
+              #endif
+1886   1      
+1887   1        return MDIN_NO_ERROR;
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 33  
+
+1888   1      }
+1889          
+1890          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1891          static MDIN_ERROR_t MDINHTX_EnablePhyPWR(PMDIN_VIDEO_INFO pINFO, BOOL OnOff)
+1892          {
+1893   1        PMDIN_HDMICTRL_INFO pCTL = (PMDIN_HDMICTRL_INFO)&pINFO->stCTL_h;
+1894   1      
+1895   1        // disable Ri check
+1896   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x076, 12, 2, 0)) return MDIN_I2C_ERROR;
+1897   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x076, 15, 1, 0)) return MDIN_I2C_ERROR;
+1898   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x026,  8, 1, 0)) return MDIN_I2C_ERROR;
+1899   1      
+1900   1        // disable KSV ready
+1901   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x076, 7, 1, 0)) return MDIN_I2C_ERROR;
+1902   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x026, 9, 1, 0)) return MDIN_I2C_ERROR;
+1903   1      
+1904   1        // disable encryption
+1905   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x00e, 8, 1, 0)) return MDIN_I2C_ERROR;
+1906   1      
+1907   1        // set power down mode
+1908   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x008, 0, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+1909   1      
+1910   1        if (OnOff==OFF) pCTL->auth = HDCP_AUTHEN_BGN;
+1911   1      
+1912   1      #if SYSTEM_USE_HTX_HDCP == 1
+                if (OnOff==OFF) return MDIN_NO_ERROR;
+                pCTL->auth = (pCTL->proc==HTX_CABLE_HDMI_OUT)? HDCP_REAUTH_REQ: HDCP_AUTHEN_BGN;
+              #endif
+1916   1      
+1917   1        return MDIN_NO_ERROR;
+1918   1      }
+1919          
+1920          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1921          static MDIN_ERROR_t MDINHTX_SoftReset(PMDIN_VIDEO_INFO pINFO)
+1922          {
+1923   1        if (MDINHTX_EnableControlPKT(ON)) return MDIN_I2C_ERROR;
+1924   1        if (MDINHTX_EnablePhyPWR(pINFO, OFF)) return MDIN_I2C_ERROR;
+1925   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x004, 8, 8, 3)) return MDIN_I2C_ERROR;
+1926   1        MDINDLY_mSec(1);
+1927   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x004, 8, 8, 0)) return MDIN_I2C_ERROR;
+1928   1        if (MDINHTX_EnablePhyPWR(pINFO, ON)) return MDIN_I2C_ERROR;
+1929   1        if (MDINHTX_EnableControlPKT(OFF)) return MDIN_I2C_ERROR;
+1930   1        MDINDLY_mSec(64);          // allow TCLK (sent to Rx across the HDMS link) to stabilize
+1931   1        return MDIN_NO_ERROR;
+1932   1      }
+1933          
+1934          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1935          static MDIN_ERROR_t MDINHTX_SetVideoMode(PMDIN_VIDEO_INFO pINFO)
+1936          {
+1937   1        WORD mode = 0, acen = 0;
+1938   1        BYTE outpath = 0;
+1939   1      //  PMDIN_HDMICTRL_INFO pCTL = (PMDIN_HDMICTRL_INFO)&pINFO->stCTL_h;
+1940   1        PMDIN_OUTVIDEO_ATTB pOUT_stATTB = (PMDIN_OUTVIDEO_ATTB)&defMDINOutVideo[pINFO->stOUT_x.frmt]; //for HDMI 
+             -Sync polarity when 4D1/2HD //by hungry 2012.08.23
+1941   1        
+1942   1        if (pINFO->dacPATH==DAC_PATH_AUX_4CH||pINFO->dacPATH==DAC_PATH_AUX_2HD) // added on 16Aug2012
+1943   1           outpath = pINFO->stOUT_x.mode;
+1944   1        else outpath = pINFO->stOUT_m.mode;
+1945   1      
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 34  
+
+1946   1        if    (outpath==MDIN_OUT_RGB444_8) {
+1947   2          switch (pINFO->stVID_h.mode) {
+1948   3            case HDMI_OUT_RGB444_8: mode = 0x00; acen = 0x00; break;  // bypass / bypass
+1949   3            case HDMI_OUT_YUV444_8: mode = 0x20; acen = 0x06; break;  // dither / RGB2YUV
+1950   3            case HDMI_OUT_SEP422_8: mode = 0x20; acen = 0x07; break;  // dither / RGB2YUV,422
+1951   3          }
+1952   2        }
+1953   1        else if (outpath==MDIN_OUT_YUV444_8) {
+1954   2          switch (pINFO->stVID_h.mode) {
+1955   3            case HDMI_OUT_RGB444_8: mode = 0x38; acen = 0x00; break;  // dither,YUV2RGB / bypass
+1956   3            case HDMI_OUT_YUV444_8: mode = 0x00; acen = 0x00; break;  // bypass / bypass
+1957   3            case HDMI_OUT_SEP422_8: mode = 0x20; acen = 0x01; break;  // dither / 422
+1958   3          }
+1959   2        }
+1960   1        else if (outpath==MDIN_OUT_MUX656_8) {    // added on 28Dec2011
+1961   2          switch (pINFO->stVID_h.mode) {
+1962   3            case HDMI_OUT_RGB444_8: mode = 0x3e; acen = 0x00; break;  // dither,YUV2RGB,444 / bypass
+1963   3            case HDMI_OUT_YUV444_8: mode = 0x06; acen = 0x00; break;  // 444 / bypass
+1964   3            case HDMI_OUT_SEP422_8: mode = 0x22; acen = 0x00; break;  // dither / bypass
+1965   3          }
+1966   2        }
+1967   1        else                       {
+1968   2          switch (pINFO->stVID_h.mode) {
+1969   3            case HDMI_OUT_RGB444_8: mode = 0x3c; acen = 0x00; break;  // dither,YUV2RGB,444 / bypass
+1970   3            case HDMI_OUT_YUV444_8: mode = 0x04; acen = 0x00; break;  // 444 / bypass
+1971   3            case HDMI_OUT_SEP422_8: mode = 0x20; acen = 0x00; break;  // dither / bypass
+1972   3          }
+1973   2        }
+1974   1      
+1975   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x04a, 0, 6, mode)) return MDIN_I2C_ERROR;
+1976   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x048, 8, 3, acen)) return MDIN_I2C_ERROR;
+1977   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x048, 0, 8, 0x00)) return MDIN_I2C_ERROR;
+1978   1      /*
+1979   1        if (pINFO->dacPATH!=DAC_PATH_AUX_4CH&&pINFO->dacPATH!=DAC_PATH_AUX_2HD) return MDIN_NO_ERROR;
+1980   1      
+1981   1        // vid_mode - syncext for 4-CH input mode, 2-HD input mode
+1982   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x04a, 0, 1, 1)) return MDIN_I2C_ERROR;  // fix syncext
+1983   1      */
+1984   1        // de_ctrl - de_gen & vs_pol# & hs_pol#
+1985   1      //    mode  = (pINFO->stOUT_m.stATTB.attb&MDIN_SCANTYPE_PROG)?  (0<<2) : (1<<2);
+1986   1      //    mode |= (pINFO->stOUT_m.stATTB.attb&MDIN_POSITIVE_VSYNC)? (0<<1) : (1<<1);
+1987   1      //    mode |= (pINFO->stOUT_m.stATTB.attb&MDIN_POSITIVE_HSYNC)? (0<<0) : (1<<0);
+1988   1        if (pINFO->dacPATH==DAC_PATH_AUX_4CH||pINFO->dacPATH==DAC_PATH_AUX_2HD){ //for HDMI Sync polarity when 4D
+             -1/2HD  //by hungry 2012.08.23
+1989   2          mode  = (pOUT_stATTB->attb&MDIN_SCANTYPE_PROG)?  (0<<2) : (1<<2);
+1990   2          mode |= (pOUT_stATTB->attb&MDIN_POSITIVE_VSYNC)? (0<<1) : (1<<1);
+1991   2          mode |= (pOUT_stATTB->attb&MDIN_POSITIVE_HSYNC)? (0<<0) : (1<<0);
+1992   2        }
+1993   1        else {
+1994   2          mode  = (pINFO->stOUT_m.stATTB.attb&MDIN_SCANTYPE_PROG)?  (0<<2) : (1<<2);
+1995   2          mode |= (pINFO->stOUT_m.stATTB.attb&MDIN_POSITIVE_VSYNC)? (0<<1) : (1<<1);
+1996   2          mode |= (pINFO->stOUT_m.stATTB.attb&MDIN_POSITIVE_HSYNC)? (0<<0) : (1<<0);
+1997   2        }
+1998   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x032, 12, 3, mode)) return MDIN_I2C_ERROR;
+1999   1      
+2000   1        // set embedded sync decoding & de generator registers
+2001   1        if (pINFO->dacPATH==DAC_PATH_AUX_4CH||pINFO->dacPATH==DAC_PATH_AUX_2HD)
+2002   1           mode = pINFO->stOUT_x.frmt;
+2003   1        else mode = pINFO->stOUT_m.frmt;
+2004   1      
+2005   1        if (MDINHTX_Set656Mode(mode)) return MDIN_I2C_ERROR;
+2006   1      
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 35  
+
+2007   1        // vid_mode - syncext for hdmi-bug
+2008   1      //  mode = (pCTL->proc==HTX_CABLE_HDMI_OUT||pCTL->proc==HTX_CABLE_DVI_OUT)? 1 : 0;
+2009   1      //  if (MDINHIF_RegField(MDIN_HDMI_ID, 0x04a, 0, 1, mode)) return MDIN_I2C_ERROR;
+2010   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x04a, 0, 1, 1)) return MDIN_I2C_ERROR;  // fix syncext
+2011   1        return MDIN_NO_ERROR;
+2012   1      }
+2013          
+2014          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2015          static MDIN_ERROR_t MDINHTX_SetClockEdge(PMDIN_VIDEO_INFO pINFO)
+2016          {
+2017   1        BOOL OnOff = MBIT(pINFO->stVID_h.fine, HDMI_CLK_EDGE_RISE);
+2018   1      
+2019   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x008, 1, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+2020   1        return MDIN_NO_ERROR;
+2021   1      }
+2022          
+2023          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2024          static MDIN_ERROR_t MDINHTX_SetDeepColor(PMDIN_VIDEO_INFO pINFO)
+2025          {
+2026   1        BOOL OnOff = MBIT(pINFO->stVID_h.fine, HDMI_DEEP_COLOR_ON);
+2027   1      
+2028   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x048, 14, 2, (OnOff)? 2 : 1)) return MDIN_I2C_ERROR;
+2029   1      
+2030   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x04a,  6, 2, (OnOff)? 2 : 0)) return MDIN_I2C_ERROR;
+2031   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x04a,  5, 1, (OnOff)? 1 : 0)) return MDIN_I2C_ERROR;
+2032   1      
+2033   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x12e, 11, 3, (OnOff)? 6 : 4)) return MDIN_I2C_ERROR;
+2034   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x12e, 14, 1, (OnOff)? 1 : 0)) return MDIN_I2C_ERROR;
+2035   1        return MDIN_NO_ERROR;
+2036   1      }
+2037          
+2038          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2039          static MDIN_ERROR_t MDINHTX_SetVideoPath(PMDIN_VIDEO_INFO pINFO)
+2040          {
+2041   1        WORD rVal;
+2042   1      
+2043   1        if (MDINHTX_SetVideoMode(pINFO)) return MDIN_I2C_ERROR;
+2044   1        if (MDINHTX_SetClockEdge(pINFO)) return MDIN_I2C_ERROR;
+2045   1        if (MDINHTX_SetDeepColor(pINFO)) return MDIN_I2C_ERROR;
+2046   1      
+2047   1        // save packet buffer control registers
+2048   1        if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x13e, &rVal)) return MDIN_I2C_ERROR;
+2049   1      
+2050   1        // Reset internal state machines and allow TCLK to Rx to stabilize
+2051   1        if (MDINHTX_SoftReset(pINFO)) return MDIN_I2C_ERROR;
+2052   1      
+2053   1        // Retrieve packet buffer control registers
+2054   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x13e, rVal)) return MDIN_I2C_ERROR;
+2055   1      
+2056   1        // set ICLK to not replicated
+2057   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x048, 0, 2, 0)) return MDIN_I2C_ERROR;
+2058   1        return MDIN_NO_ERROR;
+2059   1      }
+2060          
+2061          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2062          static MDIN_ERROR_t MDINHTX_SetSoftNVAL(PMDIN_HTXAUDIO_INFO pAUD)
+2063          {
+2064   1        WORD rVal; DWORD nVal;
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 36  
+
+2065   1      
+2066   1        if (pAUD->frmt==AUDIO_INPUT_SPDIF) {
+2067   2          if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x118, &rVal)) return MDIN_I2C_ERROR;
+2068   2          if (MDINHIF_RegField(MDIN_HDMI_ID, 0x114, 0, 8, 3)) return MDIN_I2C_ERROR;
+2069   2          pAUD->freq &= 0xf0; pAUD->freq |= LO4BIT(rVal);
+2070   2        }
+2071   1      
+2072   1        switch (LO4BIT(pAUD->freq)) {
+2073   2          case AUDIO_FREQ_32kHz:  nVal =  4096; break;
+2074   2          case AUDIO_FREQ_44kHz:  nVal =  6272; break;
+2075   2          case AUDIO_FREQ_48kHz:  nVal =  6144; break;
+2076   2          case AUDIO_FREQ_88kHz:  nVal = 12544; break;
+2077   2          case AUDIO_FREQ_96kHz:  nVal = 12288; break;
+2078   2          case AUDIO_FREQ_176kHz: nVal = 25088; break;
+2079   2          case AUDIO_FREQ_192kHz: nVal = 24576; break;
+2080   2          default:        nVal =     0; break;
+2081   2        }
+2082   1      
+2083   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x102, 8, 8, LOBYTE(LOWORD(nVal)))) return MDIN_I2C_ERROR;
+2084   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x104, 0, 8, HIBYTE(LOWORD(nVal)))) return MDIN_I2C_ERROR;
+2085   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x104, 8, 8, LOBYTE(HIWORD(nVal)))) return MDIN_I2C_ERROR;
+2086   1        return MDIN_NO_ERROR;
+2087   1      }
+2088          
+2089          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2090          static MDIN_ERROR_t MDINHTX_SetAudioInit(PMDIN_VIDEO_INFO pINFO)
+2091          {
+2092   1        PMDIN_HTXAUDIO_INFO pAUD = (PMDIN_HTXAUDIO_INFO)&pINFO->stAUD_h;
+2093   1      
+2094   1        // enable SPDIF
+2095   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x114, 0, 8, 3)) return MDIN_I2C_ERROR;
+2096   1      
+2097   1        // set software N_VAL
+2098   1        if (MDINHTX_SetSoftNVAL(pAUD)) return MDIN_I2C_ERROR;
+2099   1      
+2100   1        // enable N/CTS packet
+2101   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x100, 8, 8, 2)) return MDIN_I2C_ERROR;
+2102   1      
+2103   1        // set MCLK
+2104   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x102, 0, 8, HI4BIT(pAUD->freq))) return MDIN_I2C_ERROR;
+2105   1        return MDIN_NO_ERROR;
+2106   1      }
+2107          
+2108          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2109          static MDIN_ERROR_t MDINHTX_SetAudioPath(PMDIN_VIDEO_INFO pINFO)
+2110          {
+2111   1        WORD rVal, mode;
+2112   1        PMDIN_HTXAUDIO_INFO pAUD = (PMDIN_HTXAUDIO_INFO)&pINFO->stAUD_h;
+2113   1      
+2114   1        // disable audio input stream
+2115   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x114, 0, 1, OFF)) return MDIN_I2C_ERROR;
+2116   1      
+2117   1        // disable output audio packets
+2118   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x00c, 9, 1, ON)) return MDIN_I2C_ERROR;
+2119   1      
+2120   1        // set software N_VAL
+2121   1        if (MDINHTX_SetSoftNVAL(pAUD)) return MDIN_I2C_ERROR;
+2122   1      
+2123   1        // set software sampling frequency
+2124   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x120, 8, 8, LO4BIT(pAUD->freq))) return MDIN_I2C_ERROR;
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 37  
+
+2125   1      
+2126   1        if (pAUD->frmt==AUDIO_INPUT_SPDIF) {
+2127   2          // clear HDRA_ON, SCK_EDGE, CBIT_ORDER, VBIT
+2128   2          if (MDINHIF_RegField(MDIN_HDMI_ID, 0x11c, 12, 4, 0)) return MDIN_I2C_ERROR;
+2129   2          if (MDINHIF_RegField(MDIN_HDMI_ID, 0x11e,  0, 8, 0)) return MDIN_I2C_ERROR;
+2130   2      
+2131   2          // clear FS_OVERRIDE
+2132   2          if (MDINHIF_RegField(MDIN_HDMI_ID, 0x114, 9, 1, 0)) return MDIN_I2C_ERROR;
+2133   2      
+2134   2          MDINDLY_mSec(6);  // allow FIFO to flush
+2135   2      
+2136   2          // enable audio
+2137   2          if (MDINHIF_RegField(MDIN_HDMI_ID, 0x114, 0, 8, 3)) return MDIN_I2C_ERROR;
+2138   2      
+2139   2          // set LAYOUT_1
+2140   2          if (MDINHIF_RegField(MDIN_HDMI_ID, 0x12e, 9, 2, 0)) return MDIN_I2C_ERROR;
+2141   2        }
+2142   1        else {
+2143   2          // input I2S sample length
+2144   2          if (MDINHIF_RegField(MDIN_HDMI_ID, 0x124, 0, 8, HIBYTE(pAUD->fine))) return MDIN_I2C_ERROR;
+2145   2      /*
+2146   2          // set original sampling frequency
+2147   2          if (MDINHIF_RegField(MDIN_HDMI_ID, 0x122, 4, 4, LO4BIT(pAUD->freq))) return MDIN_I2C_ERROR;
+2148   2      
+2149   2          // set audio sample word length
+2150   2          if (MDINHIF_RegField(MDIN_HDMI_ID, 0x122, 0, 4, HIBYTE(pAUD->fine))) return MDIN_I2C_ERROR;
+2151   2      */
+2152   2          // set original sampling frequency & audio sample word length
+2153   2          mode = (1<<12) | MAKEBYTE(LO4BIT(pAUD->freq), HIBYTE(pAUD->fine));
+2154   2          if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x122, mode)) return MDIN_I2C_ERROR;
+2155   2      
+2156   2          // set I2S data in map register
+2157   2          if (MDINHIF_RegField(MDIN_HDMI_ID, 0x11c, 0, 2, pAUD->frmt)) return MDIN_I2C_ERROR;
+2158   2      
+2159   2          // set I2S control register
+2160   2          if (MDINHIF_RegField(MDIN_HDMI_ID, 0x11c, 8, 8, LOBYTE(pAUD->fine))) return MDIN_I2C_ERROR;
+2161   2      
+2162   2          // set FS_OVERRIDE
+2163   2          if (MDINHIF_RegField(MDIN_HDMI_ID, 0x114, 9, 1, 1)) return MDIN_I2C_ERROR;
+2164   2      
+2165   2          MDINDLY_mSec(6);  // allow FIFO to flush
+2166   2      
+2167   2          // enable audio
+2168   2          mode = (pAUD->fine&AUDIO_MULTI_CHANNEL)? 15 : (1<<pAUD->frmt);
+2169   2          if (MDINHIF_RegField(MDIN_HDMI_ID, 0x114, 0, 8, MAKEBYTE(mode,1))) return MDIN_I2C_ERROR;
+2170   2      
+2171   2          // set LAYOUT_1
+2172   2          if (MDINHIF_RegField(MDIN_HDMI_ID, 0x12e, 9, 2, (mode==15)? 1 : 0)) return MDIN_I2C_ERROR;
+2173   2        }
+2174   1      
+2175   1        // enable output audio packets
+2176   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x00c, 9, 1, OFF)) return MDIN_I2C_ERROR;
+2177   1      
+2178   1        // save packet buffer control registers
+2179   1        if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x13e, &rVal)) return MDIN_I2C_ERROR;
+2180   1      
+2181   1        // Reset internal state machines and allow TCLK to Rx to stabilize
+2182   1        if (MDINHTX_SoftReset(pINFO)) return MDIN_I2C_ERROR;
+2183   1      
+2184   1        // Retrieve packet buffer control registers
+2185   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x13e, rVal)) return MDIN_I2C_ERROR;
+2186   1      
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 38  
+
+2187   1        // set MCLK
+2188   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x102, 0, 8, HI4BIT(pAUD->freq))) return MDIN_I2C_ERROR;
+2189   1        return MDIN_NO_ERROR;
+2190   1      }
+2191          
+2192          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2193          // AudioDelayMS Range : 0 ~ 500(ms) for one audio stream delay
+2194          /* bob
+2195          MDIN_ERROR_t MDINHTX_SetAudioDelay(BOOL AudioDelayOn, WORD AudioDelayMS, MDIN_ADELAY_MODE_t AudioDelayMode
+             -)
+2196          {
+2197            WORD AudioDelayAmount = 0;
+2198            WORD StartRowAddr;
+2199          
+2200              if(!AudioDelayOn) { // audio delay bypass Enable
+2201                if (MDINHIF_RegField(MDIN_HOST_ID, 0x03e, 15, 1, 1)) return MDIN_I2C_ERROR; // bypass audio delay log
+             -ic
+2202              }
+2203            else {
+2204              // disable audio delay(audio pass thru) & disable audio output
+2205                  if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x1fb, 0, 2, 0)) return MDIN_I2C_ERROR;
+2206              if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x1fc, 0, 1, 0)) return MDIN_I2C_ERROR;
+2207                  
+2208                  // calculate audio delay amount : input is msec unit for each delay mode
+2209              // SCK = 64*fs = 64*48kHz = 3,072kHz, MDIN380: 4kByte/row, MDIN340: 2kByte/row
+2210                  switch (AudioDelayMode) {
+2211                // for one audio stream (SD_IN(0) selected)
+2212                      case AUDIO_DELAY_MODE_128_ONE:
+2213                  if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x1fb, 3, 2, 0)) return MDIN_I2C_ERROR; // SD_IN(0)
+2214                  if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x1fb, 5, 2, 3)) return MDIN_I2C_ERROR;
+2215                  if (AudioDelayMS>500) AudioDelayAmount = 500 * 24;      // 24(=3,072kHz/128)
+2216                  else          AudioDelayAmount = AudioDelayMS * 24;
+2217                  break;
+2218                // for all audio stream (SD_IN(3:0))
+2219                case AUDIO_DELAY_MODE_32_ALL:
+2220                  if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x1fb, 5, 2, 2)) return MDIN_I2C_ERROR;
+2221                        if (AudioDelayMS>125) AudioDelayAmount = 125 * 96;      // 96(=3,072kHz/32)
+2222                  else          AudioDelayAmount = AudioDelayMS * 96;
+2223                  break;
+2224                // for one audio stream (SD_IN(0) selected)
+2225                      case AUDIO_DELAY_MODE_64_ONE:
+2226                  if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x1fb, 3, 2, 0)) return MDIN_I2C_ERROR; // SD_IN(0)
+2227                  if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x1fb, 5, 2, 1)) return MDIN_I2C_ERROR;
+2228                  if (AudioDelayMS>250) AudioDelayAmount = 250 * 48;      // 48(=3,072kHz/64)
+2229                  else          AudioDelayAmount = AudioDelayMS * 48;
+2230                  break;
+2231                // for all audio stream (SD_IN(3:0))
+2232                case AUDIO_DELAY_MODE_16_ALL:
+2233                  if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x1fb, 5, 2, 0)) return MDIN_I2C_ERROR;
+2234                        if (AudioDelayMS>62)  AudioDelayAmount = 62 * 192;      // 192(=3,072kHz/16)
+2235                  else          AudioDelayAmount = AudioDelayMS * 192;
+2236                  break;
+2237                default: break;
+2238              }
+2239          
+2240                  // Row Addr Start/End Configuration
+2241                if (MDINHIF_RegRead(MDIN_LOCAL_ID, 0x1f8, &StartRowAddr)) return MDIN_I2C_ERROR;
+2242              if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x1f8, StartRowAddr)) return MDIN_I2C_ERROR;
+2243          #if defined(SYSTEM_USE_MDIN380)
+2244              if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x1f9, StartRowAddr+48)) return MDIN_I2C_ERROR; // 500ms = 192kByte 
+             -= 48row (4kByte/row)
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 39  
+
+2245          #elif defined(SYSTEM_USE_MDIN340)
+2246              if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x1f9, StartRowAddr+96)) return MDIN_I2C_ERROR; // 500ms = 192kByte 
+             -= 96row (2kByte/row)
+2247          #endif
+2248              if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x1fa, AudioDelayAmount)) return MDIN_I2C_ERROR; // 0x1fa[15:0] = (0
+             -~65535)
+2249          
+2250              // enable audio delay & enable audio output
+2251              if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x1fb, 0, 2, 3)) return MDIN_I2C_ERROR;
+2252              if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x1fc, 0, 1, 1)) return MDIN_I2C_ERROR;
+2253              // enable audio delay
+2254              if (MDINHIF_RegField(MDIN_HOST_ID, 0x03e, 15, 1, 0)) return MDIN_I2C_ERROR;
+2255            }
+2256            return MDIN_NO_ERROR;
+2257          }
+2258          */
+2259          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2260          static MDIN_ERROR_t MDINHTX_InitModeDVI(PMDIN_VIDEO_INFO pINFO)
+2261          {
+2262   1      #if __MDINHTX_DBGPRT__ == 1
+                Printf("InitDVITX()!!!\n\r");
+              #endif
+2265   1      
+2266   1        //  FPLL is 1.0*IDCK.
+2267   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x082, 0, 8, 0x20)) return MDIN_I2C_ERROR;
+2268   1        if (MDINHTX_SetModeHDMI(OFF)) return MDIN_I2C_ERROR;
+2269   1      
+2270   1        // set wake-up
+2271   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x008, 0, 1, 1)) return MDIN_I2C_ERROR;
+2272   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x078, 8, 8, 2)) return MDIN_I2C_ERROR;
+2273   1      
+2274   1        if (MDINHTX_SoftReset(pINFO)) return MDIN_I2C_ERROR;
+2275   1      
+2276   1      //  if (MDINHTX_Set656Mode(pINFO->stOUT_m.frmt)) return MDIN_I2C_ERROR;
+2277   1      
+2278   1        pINFO->stVID_h.mode = HDMI_OUT_RGB444_8;  // Output must be RGB
+2279   1        if (MDINHTX_SetVideoPath(pINFO)) return MDIN_I2C_ERROR;
+2280   1        if (MDINHTX_SetAudioPath(pINFO)) return MDIN_I2C_ERROR;
+2281   1      
+2282   1        // Must be done AFTER setting up audio and video paths and BEFORE starting to send InfoFrames
+2283   1        if (MDINHTX_SoftReset(pINFO)) return MDIN_I2C_ERROR;
+2284   1      
+2285   1        // disable encryption
+2286   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x00c, 9, 2, 0)) return MDIN_I2C_ERROR;
+2287   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x00e, 8, 1, 0)) return MDIN_I2C_ERROR;
+2288   1      
+2289   1        // AVI Mute clear, in DVI this must be used to clear mute
+2290   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x1de, 8, 8, 0x10)) return MDIN_I2C_ERROR;
+2291   1      
+2292   1        // Clear packet enable/repeat controls as they will not sent in DVI mode
+2293   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x13e, 0x0000)) return MDIN_I2C_ERROR;
+2294   1      
+2295   1        // set DVI interrupt mask
+2296   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x070, 0x4000)) return MDIN_I2C_ERROR;
+2297   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x074, 0x4000)) return MDIN_I2C_ERROR;
+2298   1        return MDIN_NO_ERROR;
+2299   1      }
+2300          
+2301          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2302          static MDIN_ERROR_t MDINHTX_InitModeHDMI(PMDIN_VIDEO_INFO pINFO)
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 40  
+
+2303          {
+2304   1        PMDIN_HDMICTRL_INFO pCTL = (PMDIN_HDMICTRL_INFO)&pINFO->stCTL_h;
+2305   1      
+2306   1      #if __MDINHTX_DBGPRT__ == 1
+                Printf("InitHDMITX()!!!\n\r");
+              #endif
+2309   1      
+2310   1      //  if (MDINHTX_Set656Mode(pINFO->stOUT_m.frmt)) return MDIN_I2C_ERROR;
+2311   1      
+2312   1        //  FPLL is 1.0*IDCK.
+2313   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x082, 0, 8, 0x20)) return MDIN_I2C_ERROR;
+2314   1        if (MDINHTX_SetModeHDMI(ON)) return MDIN_I2C_ERROR;
+2315   1      
+2316   1        // set wake-up
+2317   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x008, 0, 1, 1)) return MDIN_I2C_ERROR;
+2318   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x078, 8, 8, 2)) return MDIN_I2C_ERROR;
+2319   1      
+2320   1        if (MDINHTX_SetAudioInit(pINFO)) return MDIN_I2C_ERROR;
+2321   1        if (MDINHTX_SetVideoPath(pINFO)) return MDIN_I2C_ERROR;
+2322   1        if (MDINHTX_SetAudioPath(pINFO)) return MDIN_I2C_ERROR;
+2323   1      
+2324   1        // Must be done AFTER setting up audio and video paths and BEFORE starting to send InfoFrames
+2325   1        if (MDINHTX_SoftReset(pINFO)) return MDIN_I2C_ERROR;
+2326   1      
+2327   1        // enable AVI info-frame
+2328   1        if (MDINHTX_EnableInfoFrmAVI(pINFO, ON)) return MDIN_I2C_ERROR;
+2329   1      
+2330   1        // disable encryption
+2331   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x00e, 8, 1, OFF)) return MDIN_I2C_ERROR;
+2332   1      
+2333   1        // enable AUD info-frame
+2334   1        if (MDINHTX_EnableInfoFrmAUD(pINFO, ON)) return MDIN_I2C_ERROR;
+2335   1      
+2336   1        // Enable Interrupts: VSync, Ri check, HotPlug
+2337   1        // CLR_MASK is BIT_INT_HOT_PLUG|BIT_BIPHASE_ERROR|BIT_DROP_SAMPLE
+2338   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x070, 0x5800)) return MDIN_I2C_ERROR;
+2339   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x074, 0x5800)) return MDIN_I2C_ERROR;
+2340   1        
+2341   1        //pCTL->proc = HTX_CABLE_PLUG_OUT;
+2342   1        pCTL->proc = HTX_CABLE_EDID_CHK;
+2343   1        pCTL->auth = HDCP_AUTHEN_BGN;
+2344   1      
+2345   1      #if SYSTEM_USE_HTX_HDCP == 1
+                pCTL->auth = HDCP_REAUTH_REQ;
+              #endif
+2348   1      
+2349   1      #if SYSTEM_USE_HTX_HDCP == 0
+2350   1        if (MDINHTX_EnableControlPKT(OFF)) return MDIN_I2C_ERROR; // Mute OFF
+2351   1      #endif
+2352   1      
+2353   1        return MDIN_NO_ERROR;
+2354   1      }
+2355          
+2356          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2357          static void MDINHTX_ShowStatusID(PMDIN_HDMICTRL_INFO pCTL)
+2358          {
+2359   1      #if __MDINHTX_DBGPRT__ == 1
+                if (OldPROC==pCTL->proc) return;
+              
+                Printf("{HDMI-Proc}: ");
+                switch (pCTL->proc) {
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 41  
+
+                  case HTX_CABLE_PLUG_OUT:  Printf("PLUG Out\n\r"); break;
+                  case HTX_CABLE_EDID_CHK:  Printf("check EDID\n\r"); break;
+                  case HTX_CABLE_HDMI_OUT:  Printf("HDMI Out\n\r"); break;
+                  case HTX_CABLE_DVI_OUT:   Printf("DVI Out\n\r");  break;
+                  default:          Printf("Unknown\n\r");  break;
+                }
+                OldPROC = pCTL->proc;
+              #endif
+2372   1      }
+*** WARNING C280 IN LINE 2357 OF src\MDIN3xx\mdinhtx.c: 'pCTL': unreferenced local variable
+2373          
+2374          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2375          static MDIN_ERROR_t MDINHTX_IRQHandler(PMDIN_HDMICTRL_INFO pCTL)
+2376          {
+2377   1        WORD rVal, rBuff[2];
+2378   1      
+2379   1        if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x070, &rVal)) return MDIN_I2C_ERROR;
+2380   1        if ((rVal&0x01)==0) return MDIN_NO_ERROR; //no interrupt
+2381   1      
+2382   1        if (MDINHIF_MultiRead(MDIN_HDMI_ID, 0x070, (PBYTE)rBuff, 4)) return MDIN_I2C_ERROR;
+2383   1        if (MDINHIF_MultiWrite(MDIN_HDMI_ID, 0x070, (PBYTE)rBuff, 4)) return MDIN_I2C_ERROR;
+2384   1      
+2385   1        if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x008, &rVal)) return MDIN_I2C_ERROR;
+2386   1      
+2387   1        // in order not to fail bouncing detection
+2388   1      //  if ((rBuff[0]&0x4000)&&(rVal&0x0200)==0) pCTL->proc = HTX_CABLE_PLUG_OUT;
+2389   1      
+2390   1      #if __MDINHTX_DBGPRT__ == 1
+              //  if ((rBuff[0]&0x4000)&&(rVal&0x0200)==0)
+              //    Printf("HotPlug interrupt detection!!! = %04X\n\r", rVal&0x0200);
+              #endif
+2394   1      
+2395   1        // Now clear all other interrupts
+2396   1        if (MDINHIF_MultiWrite(MDIN_HDMI_ID, 0x070, (PBYTE)rBuff, 4)) return MDIN_I2C_ERROR;
+2397   1      
+2398   1      #if SYSTEM_USE_HTX_HDCP == 1
+                if (MDINHTX_KSVReadyHandler(pCTL, LOBYTE(rBuff[1]))) return MDIN_I2C_ERROR;
+                if (MDINHTX_RISCheckHandler(pCTL, HIBYTE(rBuff[1]))) return MDIN_I2C_ERROR;
+              #endif
+2402   1      
+2403   1        return MDIN_NO_ERROR;
+2404   1      }
+*** WARNING C280 IN LINE 2375 OF src\MDIN3xx\mdinhtx.c: 'pCTL': unreferenced local variable
+2405          
+2406          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2407          static MDIN_ERROR_t MDINHTX_HPDHandler(PMDIN_HDMICTRL_INFO pCTL)
+2408          {
+2409   1        WORD rVal;
+2410   1      
+2411   1        if (MDINHIF_RegRead(MDIN_HDMI_ID, 0x008, &rVal)) return MDIN_I2C_ERROR;
+2412   1      /*
+2413   1        if (rVal&0x0200) {
+2414   1          if (pCTL->proc!=HTX_CABLE_PLUG_OUT) return MDIN_NO_ERROR;
+2415   1          if (++GetPLUG<10) return MDIN_NO_ERROR;
+2416   1          pCTL->proc = HTX_CABLE_EDID_CHK;
+2417   1        }
+2418   1        else {
+2419   1          GetPLUG = 0; pCTL->proc = HTX_CABLE_PLUG_OUT;
+2420   1      //    CECDisconnect();
+2421   1        }
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 42  
+
+2422   1      */
+2423   1      #if SYSTEM_USE_HTX_HDCP == 1
+                if ((rVal&0x0200)||pCTL->auth==HDCP_AUTHEN_BGN) return MDIN_NO_ERROR;
+                pCTL->auth = HDCP_AUTHEN_REQ;
+              #endif
+2427   1      
+2428   1        return MDIN_NO_ERROR;
+2429   1      }
+*** WARNING C280 IN LINE 2407 OF src\MDIN3xx\mdinhtx.c: 'pCTL': unreferenced local variable
+2430          
+2431          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2432          static MDIN_ERROR_t MDINHTX_PWRHandler(PMDIN_HDMICTRL_INFO pCTL)
+2433          {
+2434   1        switch (pCTL->proc) {
+2435   2          case HTX_CABLE_EDID_CHK: return MDINHIF_RegField(MDIN_HDMI_ID, 0x13c, 8, 1, 1);
+2436   2          case HTX_CABLE_PLUG_OUT: return MDINHIF_RegField(MDIN_HDMI_ID, 0x13c, 8, 1, 0);
+2437   2        }
+2438   1        return MDIN_NO_ERROR;
+2439   1      }
+2440          
+2441          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2442          static MDIN_ERROR_t MDINHTX_SetAUTOFormat(PMDIN_VIDEO_INFO pINFO)
+2443          {
+2444   1        PMDIN_HDMICTRL_INFO pCTL = (PMDIN_HDMICTRL_INFO)&pINFO->stCTL_h;
+2445   1        BYTE frmt;
+2446   1      
+2447   1        if ((pINFO->stVID_h.fine&HDMI_USE_AUTO_FRMT)==0) return MDIN_NO_ERROR;
+2448   1        if ((pCTL->frmt==0x00)||(pCTL->frmt==0xff)) return MDIN_NO_ERROR;
+2449   1      
+2450   1        for (frmt=0; frmt<VIDOUT_FORMAT_END; frmt++) {
+2451   2          if (pCTL->frmt==defMDINHTXVideo[frmt].stMODE.id_1) break;
+2452   2          if (pCTL->frmt==defMDINHTXVideo[frmt].stMODE.id_2) break;
+2453   2        }
+2454   1        if (frmt==VIDOUT_FORMAT_END) return MDIN_NO_ERROR;
+2455   1      
+2456   1        // check call video process
+2457   1        if (pINFO->stOUT_m.frmt==frmt)
+2458   1           pINFO->exeFLAG &= ~MDIN_UPDATE_HDMIFMT;  // not update
+2459   1        else pINFO->exeFLAG |=  MDIN_UPDATE_HDMIFMT;  // update
+2460   1      
+2461   1        pINFO->stVID_h.mode = pCTL->mode;     // get native mode
+2462   1        pINFO->stOUT_m.frmt = frmt;         // get native format
+2463   1        return MDIN_NO_ERROR;
+2464   1      }
+2465          
+2466          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2467          static MDIN_ERROR_t MDINHTX_SetOutputMode(PMDIN_VIDEO_INFO pINFO)
+2468          {
+2469   1        PMDIN_HDMICTRL_INFO pCTL = (PMDIN_HDMICTRL_INFO)&pINFO->stCTL_h;
+2470   1      
+2471   1        if (pCTL->proc==HTX_CABLE_HDMI_OUT) {
+2472   2          if (MDINHTX_IsModeHDMI()==TRUE) return MDIN_NO_ERROR;
+2473   2          if (MDINHTX_InitModeHDMI(pINFO)) return MDIN_I2C_ERROR;
+2474   2        }
+2475   1      
+2476   1        if (pCTL->proc==HTX_CABLE_DVI_OUT) {
+2477   2          if (MDINHTX_IsModeHDMI()==FALSE) return MDIN_NO_ERROR;
+2478   2          if (MDINHTX_InitModeDVI(pINFO)) return MDIN_I2C_ERROR;
+2479   2        }
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 43  
+
+2480   1        return MDIN_NO_ERROR;
+2481   1      }
+2482          
+2483          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2484          static MDIN_ERROR_t MDINHTX_TimeOutHandler(PMDIN_VIDEO_INFO pINFO)
+2485          {
+2486   1        PMDIN_HDMICTRL_INFO pCTL = (PMDIN_HDMICTRL_INFO)&pINFO->stCTL_h;
+2487   1      
+2488   1        if (GetEDID<10) return MDIN_NO_ERROR;
+2489   1        pCTL->proc = HTX_CABLE_DVI_OUT;
+2490   1      
+2491   1        if (MDINHTX_SetOutputMode(pINFO)) return MDIN_I2C_ERROR;
+2492   1        return MDIN_NO_ERROR;
+2493   1      }
+2494          
+2495          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2496          // Drive Function for HDMI-TX Handler, Video Process
+2497          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2498          MDIN_ERROR_t MDINHTX_CtrlHandler(PMDIN_VIDEO_INFO pINFO)
+2499          {
+2500   1        PMDIN_HDMICTRL_INFO pCTL = (PMDIN_HDMICTRL_INFO)&pINFO->stCTL_h;
+2501   1      
+2502   1        if (MDINHTX_IRQHandler(pCTL)) return MDIN_I2C_ERROR;  // IRQ handler
+2503   1        if (MDINHTX_HPDHandler(pCTL)) return MDIN_I2C_ERROR;  // HPD handler
+2504   1        if (MDINHTX_PWRHandler(pCTL)) return MDIN_I2C_ERROR;  // PWR handler
+2505   1      
+2506   1        MDINHTX_ShowStatusID(pCTL); // debug print
+2507   1      
+2508   1        if (pCTL->proc==HTX_CABLE_EDID_CHK) 
+2509   1        {
+2510   2          if (MDINHTX_GetParseEDID(pINFO)) return MDIN_I2C_ERROR;
+2511   2          if (MDINHTX_VideoProcess(pINFO)) return MDIN_I2C_ERROR;
+2512   2      //    if (pCTL->proc!=HTX_CABLE_DVI_OUT) CECConnect();
+2513   2          if (MDINHTX_SetAUTOFormat(pINFO)) return MDIN_I2C_ERROR;
+2514   2          if (MDINHTX_SetOutputMode(pINFO)) return MDIN_I2C_ERROR;
+2515   2        }
+2516   1      
+2517   1        if (MDINHTX_TimeOutHandler(pINFO)) return MDIN_I2C_ERROR;
+2518   1      
+2519   1      //  if ((pCTL->proc!=HTX_CABLE_DVI_OUT)&&(pCTL->proc!=HTX_CABLE_PLUG_OUT))
+2520   1      //    CECHandler();
+2521   1      
+2522   1      #if SYSTEM_USE_HTX_HDCP == 1
+                if (MDINHTX_HDCPAuthHandler(pINFO)) return MDIN_I2C_ERROR;
+                if (MDINHTX_HDCPSHAHandler(pINFO)) return MDIN_I2C_ERROR;
+              #endif
+2526   1        return MDIN_NO_ERROR;
+2527   1      }
+2528          
+2529          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2530          MDIN_ERROR_t MDINHTX_VideoProcess(PMDIN_VIDEO_INFO pINFO)
+2531          {
+2532   1        if (pINFO->stCTL_h.proc!=HTX_CABLE_HDMI_OUT&&
+2533   1          pINFO->stCTL_h.proc!=HTX_CABLE_DVI_OUT) return MDIN_NO_ERROR;
+2534   1      
+2535   1        if (MDINHTX_SetVideoPath(pINFO)) return MDIN_I2C_ERROR;
+2536   1        if (pINFO->stCTL_h.proc!=HTX_CABLE_HDMI_OUT) return MDIN_NO_ERROR;
+2537   1      
+C51 COMPILER V9.60.7.0   MDINHTX                                                           12/22/2023 18:00:42 PAGE 44  
+
+2538   1        if (MDINHTX_SoftReset(pINFO)) return MDIN_I2C_ERROR;
+2539   1        if (MDINHTX_EnableInfoFrmAVI(pINFO, ON)) return MDIN_I2C_ERROR;
+2540   1        if (MDINHTX_EnableInfoFrmAUD(pINFO, ON)) return MDIN_I2C_ERROR;
+2541   1        return MDIN_NO_ERROR;
+2542   1      }
+2543          
+2544          //--------------------------------------------------------------------------------------------------------
+             -------------------
+2545          MDIN_ERROR_t MDINHTX_SetHDMIBlock(PMDIN_VIDEO_INFO pINFO)
+2546          {
+2547   1        if (MDINHTX_EnablePhyPWR(pINFO, ON)) return MDIN_I2C_ERROR; // PhyPowerOn
+2548   1        if (MDINHTX_EnableAllPWR(pINFO, ON)) return MDIN_I2C_ERROR; // PowerOn
+2549   1      
+2550   1        // initialize MDDC
+2551   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x0f2, 0x0f00)) return MDIN_I2C_ERROR; // ABORT
+2552   1        MDINDLY_mSec(1);
+2553   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x0f2, 0x0900)) return MDIN_I2C_ERROR; // CLEAR FIFO
+2554   1        MDINDLY_mSec(1);
+2555   1        if (MDINHIF_RegWrite(MDIN_HDMI_ID, 0x0f2, 0x0a00)) return MDIN_I2C_ERROR; // CLOCK
+2556   1        MDINDLY_mSec(1);
+2557   1        if (MDINHIF_RegField(MDIN_HDMI_ID, 0x026, 8, 8, 0)) return MDIN_I2C_ERROR;  // disable Ri
+2558   1      
+2559   1      //  if (MDINHTX_InitModeDVI(pINFO)) return MDIN_I2C_ERROR;
+2560   1        if (MDINHTX_InitModeHDMI(pINFO)) return MDIN_I2C_ERROR;
+2561   1      
+2562   1      //  CECInitialize();
+2563   1        return MDIN_NO_ERROR;
+2564   1      }
+2565          
+2566          #endif  /* defined(SYSTEM_USE_MDIN340)||defined(SYSTEM_USE_MDIN380) */
+2567          
+2568          /*  FILE_END_HERE */
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   9426    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      3     290
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      2      10
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  3 WARNING(S),  0 ERROR(S)

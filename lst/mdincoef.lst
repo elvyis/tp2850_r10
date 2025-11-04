@@ -1,0 +1,961 @@
+C51 COMPILER V9.60.7.0   MDINCOEF                                                          12/22/2023 18:00:41 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MDINCOEF
+OBJECT MODULE PLACED IN .\obj\mdincoef.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE src\MDIN3xx\mdincoef.c LARGE OPTIMIZE(9,SIZE) BROWSE DEBUG OBJECTEXTEND 
+                    -PRINT(.\lst\mdincoef.lst) TABS(2) OBJECT(.\obj\mdincoef.obj)
+
+line level    source
+
+   1          //--------------------------------------------------------------------------------------------------------
+             ---------------
+   2          // (C) Copyright 2008  Macro Image Technology Co., LTd. , All rights reserved
+   3          // 
+   4          // This source code is the property of Macro Image Technology and is provided
+   5          // pursuant to a Software License Agreement. This code's reuse and distribution
+   6          // without Macro Image Technology's permission is strictly limited by the confidential
+   7          // information provisions of the Software License Agreement.
+   8          //--------------------------------------------------------------------------------------------------------
+             ----------------
+   9          //
+  10          // File Name      :  MDINCOEF.C
+  11          // Description    :  This file contains typedefine for the driver files 
+  12          // Ref. Docment   : 
+  13          // Revision History   :
+  14          
+  15          // -----------------------------------------------------------------------------
+  16          // Include files
+  17          // -----------------------------------------------------------------------------
+  18          #include  "mdin3xx.h"
+  19          
+  20          // -----------------------------------------------------------------------------
+  21          // Struct/Union Types and define
+  22          // -----------------------------------------------------------------------------
+  23          
+  24          // ----------------------------------------------------------------------
+  25          // Static Global Data section variables
+  26          // ----------------------------------------------------------------------
+  27          
+  28          //--------------------------------------------------------------------------------------------------------
+             -------------------
+  29          // RGB to YCbCr for input CSC
+  30          ROMDATA MDIN_CSCCTRL_INFO MDIN_CscRGBtoYUV_SD_FullRange   = {
+  31            {(WORD) 258,    // coef0
+  32             (WORD)  50,    // coef1
+  33             (WORD) 132,    // coef2
+  34             (WORD)-149,    // coef3
+  35             (WORD) 225,    // coef4
+  36             (WORD) -76,    // coef5
+  37             (WORD)-188,    // coef6
+  38             (WORD) -36,    // coef7
+  39             (WORD) 225 },    // coef8
+  40            {(WORD)   0,    // in_bias0
+  41             (WORD)   0,    // in_bias1
+  42             (WORD)   0 },    // in_bias2
+  43            {(WORD)  64,    // out_bias0
+  44             (WORD) 512,    // out_bias1
+  45             (WORD) 512 },    // out_bias2
+  46             (WORD)0x1fc    // ctrl
+  47          };
+  48          
+  49          ROMDATA MDIN_CSCCTRL_INFO MDIN_CscRGBtoYUV_SD_StdRange    = {
+  50            {(WORD) 301,    // coef0    
+  51             (WORD)  58,    // coef1    
+C51 COMPILER V9.60.7.0   MDINCOEF                                                          12/22/2023 18:00:41 PAGE 2   
+
+  52             (WORD) 153,    // coef2    
+  53             (WORD)-174,    // coef3    
+  54             (WORD) 262,    // coef4    
+  55             (WORD) -88,    // coef5    
+  56             (WORD)-219,    // coef6    
+  57             (WORD) -42,    // coef7    
+  58             (WORD) 262 },    // coef8    
+  59            {(WORD)   0,    // in_bias0 
+  60             (WORD)   0,    // in_bias1 
+  61             (WORD)   0 },    // in_bias2 
+  62            {(WORD)   0,    // out_bias0
+  63             (WORD) 512,    // out_bias1
+  64             (WORD) 512 },    // out_bias2
+  65             (WORD)0x1fc    // ctrl
+  66          };
+  67          
+  68          ROMDATA MDIN_CSCCTRL_INFO MDIN_CscRGBtoYUV_HD_FullRange   = {
+  69            {(WORD) 314,    // coef0    
+  70             (WORD)  32,    // coef1    
+  71             (WORD)  94,    // coef2    
+  72             (WORD)-173,    // coef3    
+  73             (WORD) 225,    // coef4    
+  74             (WORD) -52,    // coef5    
+  75             (WORD)-204,    // coef6    
+  76             (WORD) -20,    // coef7    
+  77             (WORD) 225 },    // coef8    
+  78            {(WORD)   0,    // in_bias0 
+  79             (WORD)   0,    // in_bias1 
+  80             (WORD)   0 },    // in_bias2 
+  81            {(WORD)  64,    // out_bias0
+  82             (WORD) 512,    // out_bias1
+  83             (WORD) 512 },    // out_bias2
+  84             (WORD)0x1fc    // ctrl
+  85          };
+  86          
+  87          ROMDATA MDIN_CSCCTRL_INFO MDIN_CscRGBtoYUV_HD_StdRange    = {
+  88            {(WORD) 366,    // coef0    
+  89             (WORD)  37,    // coef1    
+  90             (WORD) 109,    // coef2    
+  91             (WORD)-202,    // coef3    
+  92             (WORD) 262,    // coef4    
+  93             (WORD) -60,    // coef5    
+  94             (WORD)-238,    // coef6    
+  95             (WORD) -24,    // coef7    
+  96             (WORD) 262 },    // coef8    
+  97            {(WORD)   0,    // in_bias0 
+  98             (WORD)   0,    // in_bias1 
+  99             (WORD)   0 },    // in_bias2 
+ 100            {(WORD)   0,    // out_bias0
+ 101             (WORD) 512,    // out_bias1
+ 102             (WORD) 512 },    // out_bias2
+ 103             (WORD)0x1fc    // ctrl
+ 104          };
+ 105          
+ 106          // YCbCr to RGB for output CSC
+ 107          ROMDATA MDIN_CSCCTRL_INFO MDIN_CscYUVtoRGB_SD_FullRange   = {
+ 108            {(WORD) 596,    // coef0    
+ 109             (WORD)-200,    // coef1    
+ 110             (WORD)-416,    // coef2    
+ 111             (WORD) 596,    // coef3    
+ 112             (WORD)1033,    // coef4    
+ 113             (WORD)   0,    // coef5    
+C51 COMPILER V9.60.7.0   MDINCOEF                                                          12/22/2023 18:00:41 PAGE 3   
+
+ 114             (WORD) 596,    // coef6    
+ 115             (WORD)   0,    // coef7    
+ 116             (WORD) 817 },    // coef8    
+ 117            {(WORD) -64,    // in_bias0 
+ 118             (WORD)-512,    // in_bias1 
+ 119             (WORD)-512 },    // in_bias2 
+ 120            {(WORD)   0,    // out_bias0
+ 121             (WORD)   0,    // out_bias1
+ 122             (WORD)   0 },    // out_bias2
+ 123             (WORD)0x1fc    // ctrl
+ 124          };
+ 125          
+ 126          ROMDATA MDIN_CSCCTRL_INFO MDIN_CscYUVtoRGB_SD_StdRange    = {
+ 127            {(WORD) 512,    // coef0    
+ 128             (WORD)-172,    // coef1    
+ 129             (WORD)-357,    // coef2    
+ 130             (WORD) 512,    // coef3    
+ 131             (WORD) 887,    // coef4    
+ 132             (WORD)   0,    // coef5    
+ 133             (WORD) 512,    // coef6    
+ 134             (WORD)   0,    // coef7    
+ 135             (WORD) 702 },    // coef8    
+ 136            {(WORD)   0,    // in_bias0 
+ 137             (WORD)-512,    // in_bias1 
+ 138             (WORD)-512 },    // in_bias2 
+ 139            {(WORD)   0,    // out_bias0
+ 140             (WORD)   0,    // out_bias1
+ 141             (WORD)   0 },    // out_bias2
+ 142             (WORD)0x1fc    // ctrl
+ 143          };
+ 144          
+ 145          ROMDATA MDIN_CSCCTRL_INFO MDIN_CscYUVtoRGB_HD_FullRange   = {
+ 146            {(WORD) 596,    // coef0    
+ 147             (WORD)-109,    // coef1    
+ 148             (WORD)-273,    // coef2    
+ 149             (WORD) 596,    // coef3    
+ 150             (WORD)1083,    // coef4    
+ 151             (WORD)   0,    // coef5    
+ 152             (WORD) 596,    // coef6    
+ 153             (WORD)   0,    // coef7    
+ 154             (WORD) 918 },    // coef8    
+ 155            {(WORD) -64,    // in_bias0 
+ 156             (WORD)-512,    // in_bias1 
+ 157             (WORD)-512 },    // in_bias2 
+ 158            {(WORD)   0,    // out_bias0
+ 159             (WORD)   0,    // out_bias1
+ 160             (WORD)   0 },    // out_bias2
+ 161             (WORD)0x1fc    // ctrl
+ 162          };
+ 163          
+ 164          ROMDATA MDIN_CSCCTRL_INFO MDIN_CscYUVtoRGB_HD_StdRange    = {
+ 165            {(WORD) 512,    // coef0    
+ 166             (WORD) -96,    // coef1    
+ 167             (WORD)-239,    // coef2    
+ 168             (WORD) 512,    // coef3    
+ 169             (WORD) 950,    // coef4    
+ 170             (WORD)   0,    // coef5    
+ 171             (WORD) 512,    // coef6    
+ 172             (WORD)   0,    // coef7    
+ 173             (WORD) 804 },    // coef8    
+ 174            {(WORD)   0,    // in_bias0 
+ 175             (WORD)-512,    // in_bias1 
+C51 COMPILER V9.60.7.0   MDINCOEF                                                          12/22/2023 18:00:41 PAGE 4   
+
+ 176             (WORD)-512 },    // in_bias2 
+ 177            {(WORD)   0,    // out_bias0
+ 178             (WORD)   0,    // out_bias1
+ 179             (WORD)   0 },    // out_bias2
+ 180             (WORD)0x1fc    // ctrl
+ 181          };
+ 182          /*
+ 183          ROMDATA MDIN_CSCCTRL_INFO MDIN_CscBypass_FullRange      = {
+ 184            {(WORD) 596,    // coef0    
+ 185             (WORD)   0,    // coef1    
+ 186             (WORD)   0,    // coef2    
+ 187             (WORD)   0,    // coef3    
+ 188             (WORD) 596,    // coef4    
+ 189             (WORD)   0,    // coef5    
+ 190             (WORD)   0,    // coef6    
+ 191             (WORD)   0,    // coef7    
+ 192             (WORD)  596 },   // coef8    
+ 193            {(WORD) -64,    // in_bias0 
+ 194             (WORD)-512,    // in_bias1 
+ 195             (WORD)-512 },    // in_bias2 
+ 196            {(WORD)   0,    // out_bias0
+ 197             (WORD) 512,    // out_bias1
+ 198             (WORD) 512 },    // out_bias2
+ 199             (WORD)0x1fc    // ctrl
+ 200          };
+ 201          
+ 202          ROMDATA MDIN_CSCCTRL_INFO MDIN_CscBypass_RemoveBlack_StdRange   = {
+ 203            {(WORD) 512,    // coef0    
+ 204             (WORD)   0,    // coef1    
+ 205             (WORD)   0,    // coef2    
+ 206             (WORD)   0,    // coef3    
+ 207             (WORD) 512,    // coef4    
+ 208             (WORD)   0,    // coef5    
+ 209             (WORD)   0,    // coef6    
+ 210             (WORD)   0,    // coef7    
+ 211             (WORD) 512 },    // coef8    
+ 212            {(WORD) -64,    // in_bias0 
+ 213             (WORD)-512,    // in_bias1 
+ 214             (WORD)-512 },    // in_bias2 
+ 215            {(WORD)   0,    // out_bias0 (remove black level)
+ 216             (WORD) 512,    // out_bias1
+ 217             (WORD) 512 },    // out_bias2
+ 218             (WORD)0x1fc    // ctrl
+ 219          };
+ 220          */
+ 221          ROMDATA MDIN_CSCCTRL_INFO MDIN_CscBypass_StdRange     = {
+ 222            {(WORD) 512,    // coef0    
+ 223             (WORD)   0,    // coef1    
+ 224             (WORD)   0,    // coef2    
+ 225             (WORD)   0,    // coef3    
+ 226             (WORD) 512,    // coef4    
+ 227             (WORD)   0,    // coef5    
+ 228             (WORD)   0,    // coef6    
+ 229             (WORD)   0,    // coef7    
+ 230             (WORD) 512 },    // coef8    
+ 231            {(WORD) -64,    // in_bias0 
+ 232             (WORD)-512,    // in_bias1 
+ 233             (WORD)-512 },    // in_bias2 
+ 234            {(WORD)  64,    // out_bias0
+ 235             (WORD) 512,    // out_bias1
+ 236             (WORD) 512 },    // out_bias2
+ 237             (WORD)0x1fc    // ctrl
+C51 COMPILER V9.60.7.0   MDINCOEF                                                          12/22/2023 18:00:41 PAGE 5   
+
+ 238          };
+ 239          
+ 240          ROMDATA MDIN_CSCCTRL_INFO MDIN_CscSDtoHD_StdRange     = {
+ 241            {(WORD) 512,    // coef0    
+ 242             (WORD)   0,    // coef1    
+ 243             (WORD)   0,    // coef2    
+ 244             (WORD)   0,    // coef3    
+ 245             (WORD) 522,    // coef4    
+ 246             (WORD)  59,    // coef5    
+ 247             (WORD)   0,    // coef6    
+ 248             (WORD)  38,    // coef7    
+ 249             (WORD) 525 },    // coef8    
+ 250            {(WORD) -64,    // in_bias0 
+ 251             (WORD)-512,    // in_bias1 
+ 252             (WORD)-512 },    // in_bias2 
+ 253            {(WORD)  64,    // out_bias0
+ 254             (WORD) 512,    // out_bias1
+ 255             (WORD) 512 },    // out_bias2
+ 256             (WORD)0x1fc    // ctrl
+ 257          };
+ 258          
+ 259          ROMDATA MDIN_CSCCTRL_INFO MDIN_CscHDtoSD_StdRange     = {
+ 260            {(WORD) 512,    // coef0    
+ 261             (WORD)  51,    // coef1    
+ 262             (WORD)  98,    // coef2    
+ 263             (WORD)   0,    // coef3    
+ 264             (WORD) 507,    // coef4    
+ 265             (WORD) -56,    // coef5    4040
+ 266             (WORD)   0,    // coef6    
+ 267             (WORD) -37,    // coef7   4059 
+ 268             (WORD) 504 },    // coef8    
+ 269            {(WORD) -64,    // in_bias0 
+ 270             (WORD)-512,    // in_bias1 
+ 271             (WORD)-512 },    // in_bias2 
+ 272            {(WORD)  64,    // out_bias0
+ 273             (WORD) 512,    // out_bias1
+ 274             (WORD) 512 },    // out_bias2
+ 275             (WORD)0x1fc    // ctrl
+ 276          };
+ 277          
+ 278          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 279          // hue range -60~60, cos(hue) table for picture HUE control
+ 280          ROMDATA WORD MDIN_CscCosHue[]   = {
+ 281            0x0200, 0x0207, 0x020e, 0x0216, 0x021d, 0x0224, 0x022b, 0x0232,
+ 282            0x0239, 0x0240, 0x0247, 0x024e, 0x0254, 0x025b, 0x0262, 0x0269,
+ 283            0x026f, 0x0276, 0x027d, 0x0283, 0x028a, 0x0290, 0x0297, 0x029d,
+ 284            0x02a3, 0x02a9, 0x02b0, 0x02b6, 0x02bc, 0x02c2, 0x02c8, 0x02ce,
+ 285            0x02d4, 0x02da, 0x02e0, 0x02e6, 0x02eb, 0x02f1, 0x02f7, 0x02fc,
+ 286            0x0302, 0x0307, 0x030d, 0x0312, 0x0318, 0x031d, 0x0322, 0x0327,
+ 287            0x032c, 0x0331, 0x0336, 0x033b, 0x0340, 0x0345, 0x034a, 0x034f,
+ 288            0x0353, 0x0358, 0x035d, 0x0361, 0x0366, 0x036a, 0x036e, 0x0373,
+ 289            0x0377, 0x037b, 0x037f, 0x0383, 0x0387, 0x038b, 0x038f, 0x0393,
+ 290            0x0396, 0x039a, 0x039e, 0x03a1, 0x03a5, 0x03a8, 0x03ac, 0x03af,
+ 291            0x03b2, 0x03b5, 0x03b8, 0x03bb, 0x03be, 0x03c1, 0x03c4, 0x03c7,
+ 292            0x03ca, 0x03cc, 0x03cf, 0x03d1, 0x03d4, 0x03d6, 0x03d9, 0x03db,
+ 293            0x03dd, 0x03df, 0x03e1, 0x03e3, 0x03e5, 0x03e7, 0x03e9, 0x03eb,
+ 294            0x03ec, 0x03ee, 0x03ef, 0x03f1, 0x03f2, 0x03f4, 0x03f5, 0x03f6,
+ 295            0x03f7, 0x03f8, 0x03f9, 0x03fa, 0x03fb, 0x03fc, 0x03fd, 0x03fd,
+ 296            0x03fe, 0x03fe, 0x03ff, 0x03ff, 0x03ff, 0x0400, 0x0400, 0x0400,
+ 297            0x0400, 0x0400, 0x0400, 0x0400, 0x03ff, 0x03ff, 0x03ff, 0x03fe,
+ 298            0x03fe, 0x03fd, 0x03fd, 0x03fc, 0x03fb, 0x03fa, 0x03f9, 0x03f8,
+C51 COMPILER V9.60.7.0   MDINCOEF                                                          12/22/2023 18:00:41 PAGE 6   
+
+ 299            0x03f7, 0x03f6, 0x03f5, 0x03f4, 0x03f2, 0x03f1, 0x03ef, 0x03ee,
+ 300            0x03ec, 0x03eb, 0x03e9, 0x03e7, 0x03e5, 0x03e3, 0x03e1, 0x03df,
+ 301            0x03dd, 0x03db, 0x03d9, 0x03d6, 0x03d4, 0x03d1, 0x03cf, 0x03cc,
+ 302            0x03ca, 0x03c7, 0x03c4, 0x03c1, 0x03be, 0x03bb, 0x03b8, 0x03b5,
+ 303            0x03b2, 0x03af, 0x03ac, 0x03a8, 0x03a5, 0x03a1, 0x039e, 0x039a,
+ 304            0x0396, 0x0393, 0x038f, 0x038b, 0x0387, 0x0383, 0x037f, 0x037b,
+ 305            0x0377, 0x0373, 0x036e, 0x036a, 0x0366, 0x0361, 0x035d, 0x0358,
+ 306            0x0353, 0x034f, 0x034a, 0x0345, 0x0340, 0x033b, 0x0336, 0x0331,
+ 307            0x032c, 0x0327, 0x0322, 0x031d, 0x0318, 0x0312, 0x030d, 0x0307,
+ 308            0x0302, 0x02fc, 0x02f7, 0x02f1, 0x02eb, 0x02e6, 0x02e0, 0x02da,
+ 309            0x02d4, 0x02ce, 0x02c8, 0x02c2, 0x02bc, 0x02b6, 0x02b0, 0x02a9,
+ 310            0x02a3, 0x029d, 0x0297, 0x0290, 0x028a, 0x0283, 0x027d, 0x0276,
+ 311            0x026f, 0x0269, 0x0262, 0x025b, 0x0254, 0x024e, 0x0247, 0x0240,
+ 312            0x0239, 0x0232, 0x022b, 0x0224, 0x021d, 0x0216, 0x020e, 0x0207
+ 313          };
+ 314          
+ 315          // hue range -60~60, sin(hue) table for picture HUE control
+ 316          ROMDATA WORD MDIN_CscSinHue[]   = {
+ 317            0xfc89, 0xfc8d, 0xfc92, 0xfc96, 0xfc9a, 0xfc9f, 0xfca3, 0xfca8,
+ 318            0xfcad, 0xfcb1, 0xfcb6, 0xfcbb, 0xfcc0, 0xfcc5, 0xfcca, 0xfccf,
+ 319            0xfcd4, 0xfcd9, 0xfcde, 0xfce3, 0xfce8, 0xfcee, 0xfcf3, 0xfcf9,
+ 320            0xfcfe, 0xfd04, 0xfd09, 0xfd0f, 0xfd15, 0xfd1a, 0xfd20, 0xfd26,
+ 321            0xfd2c, 0xfd32, 0xfd38, 0xfd3e, 0xfd44, 0xfd4a, 0xfd50, 0xfd57,
+ 322            0xfd5d, 0xfd63, 0xfd69, 0xfd70, 0xfd76, 0xfd7d, 0xfd83, 0xfd8a,
+ 323            0xfd91, 0xfd97, 0xfd9e, 0xfda5, 0xfdac, 0xfdb2, 0xfdb9, 0xfdc0,
+ 324            0xfdc7, 0xfdce, 0xfdd5, 0xfddc, 0xfde3, 0xfdea, 0xfdf2, 0xfdf9,
+ 325            0xfe00, 0xfe07, 0xfe0f, 0xfe16, 0xfe1d, 0xfe25, 0xfe2c, 0xfe34,
+ 326            0xfe3b, 0xfe43, 0xfe4a, 0xfe52, 0xfe59, 0xfe61, 0xfe69, 0xfe70,
+ 327            0xfe78, 0xfe80, 0xfe88, 0xfe8f, 0xfe97, 0xfe9f, 0xfea7, 0xfeaf,
+ 328            0xfeb7, 0xfebf, 0xfec7, 0xfecf, 0xfed7, 0xfedf, 0xfee7, 0xfeef,
+ 329            0xfef7, 0xfeff, 0xff07, 0xff0f, 0xff17, 0xff20, 0xff28, 0xff30,
+ 330            0xff38, 0xff40, 0xff49, 0xff51, 0xff59, 0xff61, 0xff6a, 0xff72,
+ 331            0xff7a, 0xff83, 0xff8b, 0xff93, 0xff9c, 0xffa4, 0xffac, 0xffb5,
+ 332            0xffbd, 0xffc5, 0xffce, 0xffd6, 0xffdf, 0xffe7, 0xffef, 0xfff8,
+ 333            0x0000, 0x0008, 0x0011, 0x0019, 0x0021, 0x002a, 0x0032, 0x003b,
+ 334            0x0043, 0x004b, 0x0054, 0x005c, 0x0064, 0x006d, 0x0075, 0x007d,
+ 335            0x0086, 0x008e, 0x0096, 0x009f, 0x00a7, 0x00af, 0x00b7, 0x00c0,
+ 336            0x00c8, 0x00d0, 0x00d8, 0x00e0, 0x00e9, 0x00f1, 0x00f9, 0x0101,
+ 337            0x0109, 0x0111, 0x0119, 0x0121, 0x0129, 0x0131, 0x0139, 0x0141,
+ 338            0x0149, 0x0151, 0x0159, 0x0161, 0x0169, 0x0171, 0x0178, 0x0180,
+ 339            0x0188, 0x0190, 0x0197, 0x019f, 0x01a7, 0x01ae, 0x01b6, 0x01bd,
+ 340            0x01c5, 0x01cc, 0x01d4, 0x01db, 0x01e3, 0x01ea, 0x01f1, 0x01f9,
+ 341            0x0200, 0x0207, 0x020e, 0x0216, 0x021d, 0x0224, 0x022b, 0x0232,
+ 342            0x0239, 0x0240, 0x0247, 0x024e, 0x0254, 0x025b, 0x0262, 0x0269,
+ 343            0x026f, 0x0276, 0x027d, 0x0283, 0x028a, 0x0290, 0x0297, 0x029d,
+ 344            0x02a3, 0x02a9, 0x02b0, 0x02b6, 0x02bc, 0x02c2, 0x02c8, 0x02ce,
+ 345            0x02d4, 0x02da, 0x02e0, 0x02e6, 0x02eb, 0x02f1, 0x02f7, 0x02fc,
+ 346            0x0302, 0x0307, 0x030d, 0x0312, 0x0318, 0x031d, 0x0322, 0x0327,
+ 347            0x032c, 0x0331, 0x0336, 0x033b, 0x0340, 0x0345, 0x034a, 0x034f,
+ 348            0x0353, 0x0358, 0x035d, 0x0361, 0x0366, 0x036a, 0x036e, 0x0373
+ 349          };
+ 350          
+ 351          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 352          /*
+ 353          // Spline, B=0.00, C=1.00, 4-tap, 64-phase for interpolation filter coefficients
+ 354          ROMDATA MDIN_MFCFILT_COEF MDIN_MFCFilter_Spline_1_00    = {
+ 355          // Spline, B=0.00, C=1.00, 4-tap, lower 32-phase
+ 356            {(WORD) 2048, (WORD)    0,    // phase 00
+ 357             (WORD) 2044, (WORD)  -60,    // phase 02
+ 358             (WORD) 2033, (WORD) -113,    // phase 04
+ 359             (WORD) 2014, (WORD) -158,    // phase 06
+C51 COMPILER V9.60.7.0   MDINCOEF                                                          12/22/2023 18:00:41 PAGE 7   
+
+ 360             (WORD) 1988, (WORD) -196,    // phase 08
+ 361             (WORD) 1956, (WORD) -228,    // phase 10
+ 362             (WORD) 1918, (WORD) -254,    // phase 12
+ 363             (WORD) 1873, (WORD) -273,    // phase 14
+ 364             (WORD) 1824, (WORD) -288,    // phase 16
+ 365             (WORD) 1770, (WORD) -298,    // phase 18
+ 366             (WORD) 1711, (WORD) -303,    // phase 20
+ 367             (WORD) 1647, (WORD) -303,    // phase 22
+ 368             (WORD) 1580, (WORD) -300,    // phase 24
+ 369             (WORD) 1509, (WORD) -293,    // phase 26
+ 370             (WORD) 1436, (WORD) -284,    // phase 28
+ 371             (WORD) 1359, (WORD) -271,    // phase 30
+ 372             (WORD) 1280, (WORD) -256,    // phase 32
+ 373             (WORD) 1199, (WORD) -239,    // phase 34
+ 374             (WORD) 1117, (WORD) -221,    // phase 36
+ 375             (WORD) 1033, (WORD) -201,    // phase 38
+ 376             (WORD)  948, (WORD) -180,    // phase 40
+ 377             (WORD)  863, (WORD) -159,    // phase 42
+ 378             (WORD)  778, (WORD) -138,    // phase 44
+ 379             (WORD)  692, (WORD) -116,    // phase 46
+ 380             (WORD)  608, (WORD)  -96,    // phase 48
+ 381             (WORD)  525, (WORD)  -77,    // phase 50
+ 382             (WORD)  443, (WORD)  -59,    // phase 52
+ 383             (WORD)  362, (WORD)  -42,    // phase 54
+ 384             (WORD)  284, (WORD)  -28,    // phase 56
+ 385             (WORD)  208, (WORD)  -16,    // phase 58
+ 386             (WORD)  136, (WORD)   -8,    // phase 60
+ 387             (WORD)   66, (WORD)   -2 },  // phase 62
+ 388          
+ 389          // Lanczos, B=0.10, C=1.00, 4-tap, upper 32-phase
+ 390            {(WORD) 1136, (WORD)  456,    // phase 00
+ 391             (WORD) 1136, (WORD)  427,    // phase 02
+ 392             (WORD) 1133, (WORD)  399,    // phase 04
+ 393             (WORD) 1129, (WORD)  372,    // phase 06
+ 394             (WORD) 1123, (WORD)  346,    // phase 08
+ 395             (WORD) 1115, (WORD)  320,    // phase 10
+ 396             (WORD) 1106, (WORD)  295,    // phase 12
+ 397             (WORD) 1095, (WORD)  271,    // phase 14
+ 398             (WORD) 1082, (WORD)  248,    // phase 16
+ 399             (WORD) 1068, (WORD)  225,    // phase 18
+ 400             (WORD) 1052, (WORD)  204,    // phase 20
+ 401             (WORD) 1034, (WORD)  184,    // phase 22
+ 402             (WORD) 1015, (WORD)  165,    // phase 24
+ 403             (WORD)  994, (WORD)  147,    // phase 26
+ 404             (WORD)  972, (WORD)  130,    // phase 28
+ 405             (WORD)  949, (WORD)  114,    // phase 30
+ 406             (WORD)  925, (WORD)   99,    // phase 32
+ 407             (WORD)  899, (WORD)   86,    // phase 34
+ 408             (WORD)  872, (WORD)   74,    // phase 36
+ 409             (WORD)  845, (WORD)   62,    // phase 38
+ 410             (WORD)  816, (WORD)   52,    // phase 40
+ 411             (WORD)  788, (WORD)   42,    // phase 42
+ 412             (WORD)  758, (WORD)   34,    // phase 44
+ 413             (WORD)  728, (WORD)   27,    // phase 46
+ 414             (WORD)  698, (WORD)   20,    // phase 48
+ 415             (WORD)  667, (WORD)   15,    // phase 50
+ 416             (WORD)  636, (WORD)   11,    // phase 52
+ 417             (WORD)  606, (WORD)    7,    // phase 54
+ 418             (WORD)  575, (WORD)    4,    // phase 56
+ 419             (WORD)  545, (WORD)    2,    // phase 58
+ 420             (WORD)  515, (WORD)    1,    // phase 60
+ 421             (WORD)  485, (WORD)    0 }   // phase 62
+C51 COMPILER V9.60.7.0   MDINCOEF                                                          12/22/2023 18:00:41 PAGE 8   
+
+ 422          };
+ 423          
+ 424          // Spline, B=0.00, C=0.75, 4-tap, 64-phase for interpolation filter coefficients
+ 425          ROMDATA MDIN_MFCFILT_COEF MDIN_MFCFilter_Spline_0_75    = {
+ 426          // Spline, B=0.00, C=0.75, 4-tap, lower 32-phase
+ 427            {(WORD) 2048, (WORD)    0,    // phase 00
+ 428             (WORD) 2044, (WORD)  -45,    // phase 02
+ 429             (WORD) 2031, (WORD)  -84,    // phase 04
+ 430             (WORD) 2009, (WORD) -118,    // phase 06
+ 431             (WORD) 1981, (WORD) -147,    // phase 08
+ 432             (WORD) 1945, (WORD) -171,    // phase 10
+ 433             (WORD) 1903, (WORD) -190,    // phase 12
+ 434             (WORD) 1854, (WORD) -205,    // phase 14
+ 435             (WORD) 1800, (WORD) -216,    // phase 16
+ 436             (WORD) 1740, (WORD) -223,    // phase 18
+ 437             (WORD) 1676, (WORD) -227,    // phase 20
+ 438             (WORD) 1607, (WORD) -227,    // phase 22
+ 439             (WORD) 1535, (WORD) -225,    // phase 24
+ 440             (WORD) 1459, (WORD) -220,    // phase 26
+ 441             (WORD) 1380, (WORD) -213,    // phase 28
+ 442             (WORD) 1299, (WORD) -203,    // phase 30
+ 443             (WORD) 1216, (WORD) -192,    // phase 32
+ 444             (WORD) 1131, (WORD) -179,    // phase 34
+ 445             (WORD) 1046, (WORD) -165,    // phase 36
+ 446             (WORD)  959, (WORD) -150,    // phase 38
+ 447             (WORD)  873, (WORD) -135,    // phase 40
+ 448             (WORD)  787, (WORD) -119,    // phase 42
+ 449             (WORD)  702, (WORD) -103,    // phase 44
+ 450             (WORD)  618, (WORD)  -87,    // phase 46
+ 451             (WORD)  536, (WORD)  -72,    // phase 48
+ 452             (WORD)  456, (WORD)  -57,    // phase 50
+ 453             (WORD)  379, (WORD)  -44,    // phase 52
+ 454             (WORD)  305, (WORD)  -31,    // phase 54
+ 455             (WORD)  235, (WORD)  -21,    // phase 56
+ 456             (WORD)  169, (WORD)  -12,    // phase 58
+ 457             (WORD)  107, (WORD)   -6,    // phase 60
+ 458             (WORD)   51, (WORD)   -2 },  // phase 62
+ 459          
+ 460          // Lanczos, B=0.10, C=1.00, 4-tap, upper 32-phase
+ 461            {(WORD) 1136, (WORD)  456,    // phase 00
+ 462             (WORD) 1136, (WORD)  427,    // phase 02
+ 463             (WORD) 1133, (WORD)  399,    // phase 04
+ 464             (WORD) 1129, (WORD)  372,    // phase 06
+ 465             (WORD) 1123, (WORD)  346,    // phase 08
+ 466             (WORD) 1115, (WORD)  320,    // phase 10
+ 467             (WORD) 1106, (WORD)  295,    // phase 12
+ 468             (WORD) 1095, (WORD)  271,    // phase 14
+ 469             (WORD) 1082, (WORD)  248,    // phase 16
+ 470             (WORD) 1068, (WORD)  225,    // phase 18
+ 471             (WORD) 1052, (WORD)  204,    // phase 20
+ 472             (WORD) 1034, (WORD)  184,    // phase 22
+ 473             (WORD) 1015, (WORD)  165,    // phase 24
+ 474             (WORD)  994, (WORD)  147,    // phase 26
+ 475             (WORD)  972, (WORD)  130,    // phase 28
+ 476             (WORD)  949, (WORD)  114,    // phase 30
+ 477             (WORD)  925, (WORD)   99,    // phase 32
+ 478             (WORD)  899, (WORD)   86,    // phase 34
+ 479             (WORD)  872, (WORD)   74,    // phase 36
+ 480             (WORD)  845, (WORD)   62,    // phase 38
+ 481             (WORD)  816, (WORD)   52,    // phase 40
+ 482             (WORD)  788, (WORD)   42,    // phase 42
+ 483             (WORD)  758, (WORD)   34,    // phase 44
+C51 COMPILER V9.60.7.0   MDINCOEF                                                          12/22/2023 18:00:41 PAGE 9   
+
+ 484             (WORD)  728, (WORD)   27,    // phase 46
+ 485             (WORD)  698, (WORD)   20,    // phase 48
+ 486             (WORD)  667, (WORD)   15,    // phase 50
+ 487             (WORD)  636, (WORD)   11,    // phase 52
+ 488             (WORD)  606, (WORD)    7,    // phase 54
+ 489             (WORD)  575, (WORD)    4,    // phase 56
+ 490             (WORD)  545, (WORD)    2,    // phase 58
+ 491             (WORD)  515, (WORD)    1,    // phase 60
+ 492             (WORD)  485, (WORD)    0 }   // phase 62
+ 493          };
+ 494          */
+ 495          // Spline, B=0.00, C=0.50, 4-tap, 64-phase for interpolation filter coefficients
+ 496          ROMDATA MDIN_MFCFILT_COEF MDIN_MFCFilter_Spline_0_50    = {
+ 497          // Spline, B=0.00, C=0.50, 4-tap, lower 32-phase
+ 498            {(WORD) 2048, (WORD)    0,    // phase 00
+ 499             (WORD) 2043, (WORD)  -30,    // phase 02
+ 500             (WORD) 2029, (WORD)  -56,    // phase 04
+ 501             (WORD) 2006, (WORD)  -79,    // phase 06
+ 502             (WORD) 1974, (WORD)  -98,    // phase 08
+ 503             (WORD) 1935, (WORD) -114,    // phase 10
+ 504             (WORD) 1888, (WORD) -127,    // phase 12
+ 505             (WORD) 1835, (WORD) -137,    // phase 14
+ 506             (WORD) 1776, (WORD) -144,    // phase 16
+ 507             (WORD) 1711, (WORD) -149,    // phase 18
+ 508             (WORD) 1642, (WORD) -151,    // phase 20
+ 509             (WORD) 1568, (WORD) -152,    // phase 22
+ 510             (WORD) 1490, (WORD) -150,    // phase 24
+ 511             (WORD) 1409, (WORD) -147,    // phase 26
+ 512             (WORD) 1325, (WORD) -142,    // phase 28
+ 513             (WORD) 1239, (WORD) -135,    // phase 30
+ 514             (WORD) 1152, (WORD) -128,    // phase 32
+ 515             (WORD) 1064, (WORD) -120,    // phase 34
+ 516             (WORD)  975, (WORD) -110,    // phase 36
+ 517             (WORD)  886, (WORD) -100,    // phase 38
+ 518             (WORD)  798, (WORD)  -90,    // phase 40
+ 519             (WORD)  711, (WORD)  -79,    // phase 42
+ 520             (WORD)  626, (WORD)  -69,    // phase 44
+ 521             (WORD)  544, (WORD)  -58,    // phase 46
+ 522             (WORD)  464, (WORD)  -48,    // phase 48
+ 523             (WORD)  388, (WORD)  -38,    // phase 50
+ 524             (WORD)  316, (WORD)  -29,    // phase 52
+ 525             (WORD)  248, (WORD)  -21,    // phase 54
+ 526             (WORD)  186, (WORD)  -14,    // phase 56
+ 527             (WORD)  129, (WORD)   -8,    // phase 58
+ 528             (WORD)   79, (WORD)   -4,    // phase 60
+ 529             (WORD)   36, (WORD)   -1 },  // phase 62
+ 530          
+ 531          // Lanczos, B=0.10, C=1.00, 4-tap, upper 32-phase
+ 532            {(WORD) 1136, (WORD)  456,    // phase 00
+ 533             (WORD) 1136, (WORD)  427,    // phase 02
+ 534             (WORD) 1133, (WORD)  399,    // phase 04
+ 535             (WORD) 1129, (WORD)  372,    // phase 06
+ 536             (WORD) 1123, (WORD)  346,    // phase 08
+ 537             (WORD) 1115, (WORD)  320,    // phase 10
+ 538             (WORD) 1106, (WORD)  295,    // phase 12
+ 539             (WORD) 1095, (WORD)  271,    // phase 14
+ 540             (WORD) 1082, (WORD)  248,    // phase 16
+ 541             (WORD) 1068, (WORD)  225,    // phase 18
+ 542             (WORD) 1052, (WORD)  204,    // phase 20
+ 543             (WORD) 1034, (WORD)  184,    // phase 22
+ 544             (WORD) 1015, (WORD)  165,    // phase 24
+ 545             (WORD)  994, (WORD)  147,    // phase 26
+C51 COMPILER V9.60.7.0   MDINCOEF                                                          12/22/2023 18:00:41 PAGE 10  
+
+ 546             (WORD)  972, (WORD)  130,    // phase 28
+ 547             (WORD)  949, (WORD)  114,    // phase 30
+ 548             (WORD)  925, (WORD)   99,    // phase 32
+ 549             (WORD)  899, (WORD)   86,    // phase 34
+ 550             (WORD)  872, (WORD)   74,    // phase 36
+ 551             (WORD)  845, (WORD)   62,    // phase 38
+ 552             (WORD)  816, (WORD)   52,    // phase 40
+ 553             (WORD)  788, (WORD)   42,    // phase 42
+ 554             (WORD)  758, (WORD)   34,    // phase 44
+ 555             (WORD)  728, (WORD)   27,    // phase 46
+ 556             (WORD)  698, (WORD)   20,    // phase 48
+ 557             (WORD)  667, (WORD)   15,    // phase 50
+ 558             (WORD)  636, (WORD)   11,    // phase 52
+ 559             (WORD)  606, (WORD)    7,    // phase 54
+ 560             (WORD)  575, (WORD)    4,    // phase 56
+ 561             (WORD)  545, (WORD)    2,    // phase 58
+ 562             (WORD)  515, (WORD)    1,    // phase 60
+ 563             (WORD)  485, (WORD)    0 }   // phase 62
+ 564          };
+ 565          /*
+ 566          // Bi-linear (2-tap), 32-phase for interpolation filter coefficients
+ 567          ROMDATA MDIN_MFCFILT_COEF MDIN_MFCFilter_Bilinear   = {
+ 568            {(WORD) 2048, (WORD)    0,    // phase 00
+ 569             (WORD) 1984, (WORD)    0,    // phase 02
+ 570             (WORD) 1920, (WORD)    0,    // phase 04
+ 571             (WORD) 1856, (WORD)    0,    // phase 06
+ 572             (WORD) 1792, (WORD)    0,    // phase 08
+ 573             (WORD) 1728, (WORD)    0,    // phase 10
+ 574             (WORD) 1664, (WORD)    0,    // phase 12
+ 575             (WORD) 1600, (WORD)    0,    // phase 14
+ 576             (WORD) 1536, (WORD)    0,    // phase 16
+ 577             (WORD) 1472, (WORD)    0,    // phase 18
+ 578             (WORD) 1408, (WORD)    0,    // phase 20
+ 579             (WORD) 1344, (WORD)    0,    // phase 22
+ 580             (WORD) 1280, (WORD)    0,    // phase 24
+ 581             (WORD) 1216, (WORD)    0,    // phase 26
+ 582             (WORD) 1152, (WORD)    0,    // phase 28
+ 583             (WORD) 1088, (WORD)    0,    // phase 30
+ 584             (WORD) 1024, (WORD)    0,    // phase 32
+ 585             (WORD)  960, (WORD)    0,    // phase 34
+ 586             (WORD)  896, (WORD)    0,    // phase 36
+ 587             (WORD)  832, (WORD)    0,    // phase 38
+ 588             (WORD)  768, (WORD)    0,    // phase 40
+ 589             (WORD)  704, (WORD)    0,    // phase 42
+ 590             (WORD)  640, (WORD)    0,    // phase 44
+ 591             (WORD)  576, (WORD)    0,    // phase 46
+ 592             (WORD)  512, (WORD)    0,    // phase 48
+ 593             (WORD)  448, (WORD)    0,    // phase 50
+ 594             (WORD)  384, (WORD)    0,    // phase 52
+ 595             (WORD)  320, (WORD)    0,    // phase 54
+ 596             (WORD)  256, (WORD)    0,    // phase 56
+ 597             (WORD)  192, (WORD)    0,    // phase 58
+ 598             (WORD)  128, (WORD)    0,    // phase 60
+ 599             (WORD)   64, (WORD)    0 },  // phase 62
+ 600          
+ 601          // Lanczos, B=0.10, C=1.00, 4-tap, upper 32-phase
+ 602            {(WORD) 1136, (WORD)  456,    // phase 00
+ 603             (WORD) 1136, (WORD)  427,    // phase 02
+ 604             (WORD) 1133, (WORD)  399,    // phase 04
+ 605             (WORD) 1129, (WORD)  372,    // phase 06
+ 606             (WORD) 1123, (WORD)  346,    // phase 08
+ 607             (WORD) 1115, (WORD)  320,    // phase 10
+C51 COMPILER V9.60.7.0   MDINCOEF                                                          12/22/2023 18:00:41 PAGE 11  
+
+ 608             (WORD) 1106, (WORD)  295,    // phase 12
+ 609             (WORD) 1095, (WORD)  271,    // phase 14
+ 610             (WORD) 1082, (WORD)  248,    // phase 16
+ 611             (WORD) 1068, (WORD)  225,    // phase 18
+ 612             (WORD) 1052, (WORD)  204,    // phase 20
+ 613             (WORD) 1034, (WORD)  184,    // phase 22
+ 614             (WORD) 1015, (WORD)  165,    // phase 24
+ 615             (WORD)  994, (WORD)  147,    // phase 26
+ 616             (WORD)  972, (WORD)  130,    // phase 28
+ 617             (WORD)  949, (WORD)  114,    // phase 30
+ 618             (WORD)  925, (WORD)   99,    // phase 32
+ 619             (WORD)  899, (WORD)   86,    // phase 34
+ 620             (WORD)  872, (WORD)   74,    // phase 36
+ 621             (WORD)  845, (WORD)   62,    // phase 38
+ 622             (WORD)  816, (WORD)   52,    // phase 40
+ 623             (WORD)  788, (WORD)   42,    // phase 42
+ 624             (WORD)  758, (WORD)   34,    // phase 44
+ 625             (WORD)  728, (WORD)   27,    // phase 46
+ 626             (WORD)  698, (WORD)   20,    // phase 48
+ 627             (WORD)  667, (WORD)   15,    // phase 50
+ 628             (WORD)  636, (WORD)   11,    // phase 52
+ 629             (WORD)  606, (WORD)    7,    // phase 54
+ 630             (WORD)  575, (WORD)    4,    // phase 56
+ 631             (WORD)  545, (WORD)    2,    // phase 58
+ 632             (WORD)  515, (WORD)    1,    // phase 60
+ 633             (WORD)  485, (WORD)    0 }   // phase 62
+ 634          };
+ 635          
+ 636          // Most-Blur (2-tap), 32-phase for interpolation filter coefficients
+ 637          ROMDATA MDIN_MFCFILT_COEF MDIN_MFCFilter_BSpline_Most_Blur  = {
+ 638            {(WORD) 1365, (WORD)  341,    // phase 00
+ 639             (WORD) 1364, (WORD)  310,    // phase 02
+ 640             (WORD) 1358, (WORD)  281,    // phase 04
+ 641             (WORD) 1348, (WORD)  254,    // phase 06
+ 642             (WORD) 1335, (WORD)  229,    // phase 08
+ 643             (WORD) 1319, (WORD)  205,    // phase 10
+ 644             (WORD) 1300, (WORD)  183,    // phase 12
+ 645             (WORD) 1278, (WORD)  163,    // phase 14
+ 646             (WORD) 1253, (WORD)  144,    // phase 16
+ 647             (WORD) 1226, (WORD)  127,    // phase 18
+ 648             (WORD) 1197, (WORD)  111,    // phase 20
+ 649             (WORD) 1165, (WORD)   96,    // phase 22
+ 650             (WORD) 1131, (WORD)   83,    // phase 24
+ 651             (WORD) 1096, (WORD)   71,    // phase 26
+ 652             (WORD) 1059, (WORD)   61,    // phase 28
+ 653             (WORD) 1021, (WORD)   51,    // phase 30
+ 654             (WORD)  981, (WORD)   43,    // phase 32
+ 655             (WORD)  941, (WORD)   35,    // phase 34
+ 656             (WORD)  900, (WORD)   29,    // phase 36
+ 657             (WORD)  858, (WORD)   23,    // phase 38
+ 658             (WORD)  815, (WORD)   18,    // phase 40
+ 659             (WORD)  773, (WORD)   14,    // phase 42
+ 660             (WORD)  730, (WORD)   10,    // phase 44
+ 661             (WORD)  687, (WORD)    8,    // phase 46
+ 662             (WORD)  645, (WORD)    5,    // phase 48
+ 663             (WORD)  604, (WORD)    3,    // phase 50
+ 664             (WORD)  563, (WORD)    2,    // phase 52
+ 665             (WORD)  523, (WORD)    1,    // phase 54
+ 666             (WORD)  483, (WORD)    1,    // phase 56
+ 667             (WORD)  446, (WORD)    0,    // phase 58
+ 668             (WORD)  409, (WORD)    0,    // phase 60
+ 669             (WORD)  374, (WORD)    0 },  // phase 62
+C51 COMPILER V9.60.7.0   MDINCOEF                                                          12/22/2023 18:00:41 PAGE 12  
+
+ 670          
+ 671          // Lanczos, B=0.10, C=1.00, 4-tap, upper 32-phase
+ 672            {(WORD) 1136, (WORD)  456,    // phase 00
+ 673             (WORD) 1136, (WORD)  427,    // phase 02
+ 674             (WORD) 1133, (WORD)  399,    // phase 04
+ 675             (WORD) 1129, (WORD)  372,    // phase 06
+ 676             (WORD) 1123, (WORD)  346,    // phase 08
+ 677             (WORD) 1115, (WORD)  320,    // phase 10
+ 678             (WORD) 1106, (WORD)  295,    // phase 12
+ 679             (WORD) 1095, (WORD)  271,    // phase 14
+ 680             (WORD) 1082, (WORD)  248,    // phase 16
+ 681             (WORD) 1068, (WORD)  225,    // phase 18
+ 682             (WORD) 1052, (WORD)  204,    // phase 20
+ 683             (WORD) 1034, (WORD)  184,    // phase 22
+ 684             (WORD) 1015, (WORD)  165,    // phase 24
+ 685             (WORD)  994, (WORD)  147,    // phase 26
+ 686             (WORD)  972, (WORD)  130,    // phase 28
+ 687             (WORD)  949, (WORD)  114,    // phase 30
+ 688             (WORD)  925, (WORD)   99,    // phase 32
+ 689             (WORD)  899, (WORD)   86,    // phase 34
+ 690             (WORD)  872, (WORD)   74,    // phase 36
+ 691             (WORD)  845, (WORD)   62,    // phase 38
+ 692             (WORD)  816, (WORD)   52,    // phase 40
+ 693             (WORD)  788, (WORD)   42,    // phase 42
+ 694             (WORD)  758, (WORD)   34,    // phase 44
+ 695             (WORD)  728, (WORD)   27,    // phase 46
+ 696             (WORD)  698, (WORD)   20,    // phase 48
+ 697             (WORD)  667, (WORD)   15,    // phase 50
+ 698             (WORD)  636, (WORD)   11,    // phase 52
+ 699             (WORD)  606, (WORD)    7,    // phase 54
+ 700             (WORD)  575, (WORD)    4,    // phase 56
+ 701             (WORD)  545, (WORD)    2,    // phase 58
+ 702             (WORD)  515, (WORD)    1,    // phase 60
+ 703             (WORD)  485, (WORD)    0 }   // phase 62
+ 704          };
+ 705          
+ 706          // More-Blur (2-tap), 32-phase for interpolation filter coefficients
+ 707          ROMDATA MDIN_MFCFILT_COEF MDIN_MFCFilter_BSpline_More_Blur  = {
+ 708            {(WORD) 1707, (WORD)  171,    // phase 00
+ 709             (WORD) 1703, (WORD)  140,    // phase 02
+ 710             (WORD) 1693, (WORD)  113,    // phase 04
+ 711             (WORD) 1677, (WORD)   88,    // phase 06
+ 712             (WORD) 1655, (WORD)   65,    // phase 08
+ 713             (WORD) 1627, (WORD)   46,    // phase 10
+ 714             (WORD) 1594, (WORD)   28,    // phase 12
+ 715             (WORD) 1556, (WORD)   13,    // phase 14
+ 716             (WORD) 1515, (WORD)    0,    // phase 16
+ 717             (WORD) 1469, (WORD)  -11,    // phase 18
+ 718             (WORD) 1419, (WORD)  -20,    // phase 20
+ 719             (WORD) 1366, (WORD)  -27,    // phase 22
+ 720             (WORD) 1311, (WORD)  -33,    // phase 24
+ 721             (WORD) 1253, (WORD)  -38,    // phase 26
+ 722             (WORD) 1192, (WORD)  -40,    // phase 28
+ 723             (WORD) 1130, (WORD)  -42,    // phase 30
+ 724             (WORD) 1067, (WORD)  -43,    // phase 32
+ 725             (WORD) 1002, (WORD)  -42,    // phase 34
+ 726             (WORD)  937, (WORD)  -41,    // phase 36
+ 727             (WORD)  872, (WORD)  -39,    // phase 38
+ 728             (WORD)  807, (WORD)  -36,    // phase 40
+ 729             (WORD)  742, (WORD)  -33,    // phase 42
+ 730             (WORD)  678, (WORD)  -29,    // phase 44
+ 731             (WORD)  615, (WORD)  -25,    // phase 46
+C51 COMPILER V9.60.7.0   MDINCOEF                                                          12/22/2023 18:00:41 PAGE 13  
+
+ 732             (WORD)  555, (WORD)  -21,    // phase 48
+ 733             (WORD)  496, (WORD)  -17,    // phase 50
+ 734             (WORD)  439, (WORD)  -13,    // phase 52
+ 735             (WORD)  385, (WORD)  -10,    // phase 54
+ 736             (WORD)  335, (WORD)   -7,    // phase 56
+ 737             (WORD)  287, (WORD)   -4,    // phase 58
+ 738             (WORD)  244, (WORD)   -2,    // phase 60
+ 739             (WORD)  205, (WORD)    0 },  // phase 62
+ 740          
+ 741          // Lanczos, B=0.10, C=1.00, 4-tap, upper 32-phase
+ 742            {(WORD) 1136, (WORD)  456,    // phase 00
+ 743             (WORD) 1136, (WORD)  427,    // phase 02
+ 744             (WORD) 1133, (WORD)  399,    // phase 04
+ 745             (WORD) 1129, (WORD)  372,    // phase 06
+ 746             (WORD) 1123, (WORD)  346,    // phase 08
+ 747             (WORD) 1115, (WORD)  320,    // phase 10
+ 748             (WORD) 1106, (WORD)  295,    // phase 12
+ 749             (WORD) 1095, (WORD)  271,    // phase 14
+ 750             (WORD) 1082, (WORD)  248,    // phase 16
+ 751             (WORD) 1068, (WORD)  225,    // phase 18
+ 752             (WORD) 1052, (WORD)  204,    // phase 20
+ 753             (WORD) 1034, (WORD)  184,    // phase 22
+ 754             (WORD) 1015, (WORD)  165,    // phase 24
+ 755             (WORD)  994, (WORD)  147,    // phase 26
+ 756             (WORD)  972, (WORD)  130,    // phase 28
+ 757             (WORD)  949, (WORD)  114,    // phase 30
+ 758             (WORD)  925, (WORD)   99,    // phase 32
+ 759             (WORD)  899, (WORD)   86,    // phase 34
+ 760             (WORD)  872, (WORD)   74,    // phase 36
+ 761             (WORD)  845, (WORD)   62,    // phase 38
+ 762             (WORD)  816, (WORD)   52,    // phase 40
+ 763             (WORD)  788, (WORD)   42,    // phase 42
+ 764             (WORD)  758, (WORD)   34,    // phase 44
+ 765             (WORD)  728, (WORD)   27,    // phase 46
+ 766             (WORD)  698, (WORD)   20,    // phase 48
+ 767             (WORD)  667, (WORD)   15,    // phase 50
+ 768             (WORD)  636, (WORD)   11,    // phase 52
+ 769             (WORD)  606, (WORD)    7,    // phase 54
+ 770             (WORD)  575, (WORD)    4,    // phase 56
+ 771             (WORD)  545, (WORD)    2,    // phase 58
+ 772             (WORD)  515, (WORD)    1,    // phase 60
+ 773             (WORD)  485, (WORD)    0 }   // phase 62
+ 774          };
+ 775          */
+ 776          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 777          // Coefficients for filter
+ 778          ROMDATA MDIN_FNRFILT_COEF MDIN_FrontNRFilter_Default[]  = {
+ 779            // 1920 to 1440 ~ 1920 ==>  bypass
+ 780            { {0x0400, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000}, // Y
+ 781            {0x0400, 0x0000, 0x0000, 0x0000}  },                // C
+ 782          
+ 783            // 1920 to 1024 ~ 1440 ==> cut0.563
+ 784            { {0x0240, 0x0140, 0x0FC2, 0x0FA7, 0x002D, 0x0010, 0x0FFA, 0x0000}, // Y
+ 785            {0x0222, 0x00F9, 0x0FF6, 0x0000}  },                // C
+ 786          
+ 787            // 1920 to 720 ~ 1024  ==> cut0.375
+ 788            { {0x017E, 0x0125, 0x006A, 0x0FDE, 0x0FC7, 0x0FF2, 0x000F, 0x000C}, // Y
+ 789            {0x0156, 0x0116, 0x003F, 0x0000}  },                // C
+ 790          
+ 791            // 1920 to 640 ~ 720   ==> cut0.333
+ 792            { {0x0158, 0x011A, 0x008B, 0x0FFE, 0x0FBD, 0x0FCF, 0x0003, 0x0022}, // Y
+C51 COMPILER V9.60.7.0   MDINCOEF                                                          12/22/2023 18:00:41 PAGE 14  
+
+ 793            {0x0156, 0x0116, 0x003F, 0x0000}  },                // C
+ 794          
+ 795            // 1920 to 480 ~ 640   ==> cut0.250
+ 796            { {0x0100, 0x00E1, 0x0094, 0x003F, 0x0000, 0x0FE9, 0x0FEC, 0x0FF7}, // Y
+ 797            {0x0100, 0x00D7, 0x007E, 0x002B}  }                 // C
+ 798          };
+ 799          
+ 800          ROMDATA MDIN_PEAKING_COEF MDIN_PeakingFilter_Default[]  = {
+ 801            {0x0200, 0x0000, 0x0700, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000}
+ 802          };
+ 803          
+ 804          ROMDATA MDIN_COLOREN_COEF MDIN_ColorEnFilter_Default[]  = {
+ 805            {0x0100, 0x0080, 0x0000, 0x0000}
+ 806          };
+ 807          
+ 808          ROMDATA MDIN_BNRFILT_COEF MDIN_BlockNRFilter_Default[]  = {
+ 809            {0x0200, 0x0100, 0x0000, 0x0000}
+ 810          };
+ 811          
+ 812          ROMDATA MDIN_MOSQUIT_COEF MDIN_MosquitFilter_Default[]  = {
+ 813            {0x0004, 0x1480, 0x0700, 0x0100, 0x0010, 0x00c4, 0x0102, 0x0000, 0x0c62}
+ 814          };
+ 815          
+ 816          ROMDATA MDIN_COLORTON_COEF MDIN_ColorTonFilter_Default[]  = {
+ 817            {0x435a, 0x0dd3, 0x0200, 0xc3e0, 0x0230}, // Skin Color
+ 818            {0x4ea2, 0x0c3e, 0x0200, 0xc3e0, 0x0230}, // Grass Color
+ 819            {0x4c81, 0x0e10, 0x0200, 0xc3e0, 0x0230}, // Green Color
+ 820            {0x4f1a, 0x03e5, 0x0200, 0xc3e0, 0x0230}, // Blue  Color
+ 821            {0x4d2c, 0x02d4, 0x0200, 0xc3e0, 0x0230}  // Sky Color
+ 822          };
+ 823          
+ 824          ROMDATA MDIN_AUXFILT_COEF MDIN_AuxDownFilter_Default[]  = {
+ 825            {0x0100, 0x0000, 0x0000, 0x0000, 0x0000}, // HY
+ 826            {0x0100, 0x0000, 0x0000, 0x0000},     // HC
+ 827            {0x0100, 0x0000, 0x0000},         // VY
+ 828            {0x0100, 0x0000}              // VC
+ 829          };
+ 830          
+ 831          ROMDATA MDIN_AUXFILT_COEF MDIN_AuxFilterCoef[]  = {
+ 832            { {0x00aa, 0x0047, 0x03e4, 0x0000, 0x0000}, // HY - 1920x1080 to 1280x1024
+ 833            {0x00aa, 0x0047, 0x03e4, 0x0000},     // HC
+ 834            {0x00f4, 0x000b, 0x03fb},         // VY
+ 835            {0x00f2, 0x0007}  },            // VC
+ 836          
+ 837            { {0x008a, 0x0051, 0x03f8, 0x03f2, 0x0000}, // HY - 1920x1080 to 1024x768
+ 838            {0x0088, 0x003e, 0x03fe, 0x0000},     // HC
+ 839            {0x00b6, 0x0034, 0x03f1},         // VY
+ 840            {0x00b6, 0x0025}  },            // VC
+ 841          
+ 842            { {0x006a, 0x0044, 0x000a, 0x03fd, 0x0000}, // HY - 1920x1080 to 800x600
+ 843            {0x006c, 0x0044, 0x0006, 0x0000},     // HC
+ 844            {0x008e, 0x003d, 0x03fc},         // VY
+ 845            {0x008e, 0x0039}  },            // VC
+ 846          
+ 847            { {0x0060, 0x0043, 0x000f, 0x03fe, 0x0000}, // HY - 1920x1080 to 720x576
+ 848            {0x0060, 0x0046, 0x000a, 0x0000},     // HC
+ 849            {0x0088, 0x003f, 0x03fd},         // VY
+ 850            {0x008a, 0x003b}  },            // VC
+ 851          
+ 852            { {0x0060, 0x0043, 0x000f, 0x03fe, 0x0000}, // HY - 1920x1080 to 720x480
+ 853            {0x0060, 0x0046, 0x000a, 0x0000},     // HC
+ 854            {0x0072, 0x0042, 0x0005},         // VY
+C51 COMPILER V9.60.7.0   MDINCOEF                                                          12/22/2023 18:00:41 PAGE 15  
+
+ 855            {0x0072, 0x0047}  },            // VC
+ 856          };
+ 857          
+ 858          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 859          // default value for Deinterlacer
+ 860          ROMDATA MDIN_DEINTER_COEF MDIN_Deinter_Default[]    = {
+ 861          //     0       1       2       3       4       5       6       7       8       9       A       B       C  
+             -     D       E       F
+ 862            0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0xb1d9, 0x1010, 0x0000, 0x5f47, 0x0068, 0x0b23, 0x5907, 0x1017, 0
+             -x3f08, 0x0809, 0x0810, // 200
+ 863            0x1f1c, 0x1212, 0x0c14, 0x0014, 0x0408, 0x0608, 0xb000, 0x0000, 0x44c4, 0x2710, 0x2710, 0x0000, 0x0000, 0
+             -x0000, 0x0000, 0x0000, // 210
+ 864            0x007f, 0x08c8, 0x3804, 0x00ff, 0x00ff, 0xffff, 0x1008, 0x000a, 0x0001, 0x000f, 0x0a14, 0x000a, 0x2600, 0
+             -x0000, 0x6650, 0x5232, // 220
+ 865            0x122a, 0xab32, 0x9957, 0x0000, 0x0000, 0x0000, 0x063f, 0x968a, 0x1011, 0xffff, 0xffff, 0x0304, 0xffff, 0
+             -x0000, 0x0000, 0x0000, // 230
+ 866            0x6808, 0xE820, 0x8040, 0x0008, 0x0000, 0x0000, 0xc048, 0x0000, 0x730a, 0x150a, 0x0014, 0x0288, 0x0000, 0
+             -x0000, 0x0000, 0x0000, // 240
+ 867            0xc208, 0x00b4, 0x002f, 0x60d0, 0x0313, 0xa206, 0x0008, 0x0602, 0x3C14, 0x0110, 0x0128, 0x0108, 0xffff, 0
+             -xb044, 0x0000, 0x0000, // 250
+ 868            0x1f1a, 0x00a1, 0xf044, 0x0000, 0x1412, 0x1244, 0x0bf8, 0x3f10, 0x0062, 0x4040, 0x105c, 0x0000, 0x5180, 0
+             -x0001, 0x0000, 0x000e, // 260
+ 869            0x040a, 0x0108, 0x7f10, 0x1482, 0x050f, 0x6c6c, 0x0000, 0x0000, 0x0000, 0x00a0, 0xb000, 0x0000, 0x0000, 0
+             -x0000, 0x0000, 0x0000 // 270
+ 870          };
+ 871          
+ 872          #if defined(SYSTEM_USE_MDIN325)||defined(SYSTEM_USE_MDIN325A)||defined(SYSTEM_USE_MDIN380)
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              // default value for Video Encoder
+              ROMDATA MDIN_ENCODER_COEF MDIN_Encoder_Default[]    = {
+              //     0       1       2       3       4       5       6       7       8       9       A       B       C  
+             -     D       E       F
+                { 0x2000, 0x16b9, 0x84c7, 0x888e, 0x0200, 0x8070, 0xa8f0, 0x1200, 0x1800, 0x7c1f, 0x21f0, 0x1000, 0xa021
+             -, 0x0800, 0x0000, 0x0000, // 1E0
+                0x0000, 0x0000, 0x0000 },   // NTSC system                                          // 1F0
+              
+                { 0xA000, 0x16bb, 0x84c7, 0xd089, 0x0200, 0x8075, 0x00fc, 0x1200, 0x1801, 0x8acb, 0x2a09, 0x3000, 0xa023
+             -, 0x0a00, 0x0600, 0x0000, // 1E0
+                0x0400, 0x0000, 0x0000 }    // PAL system                                         // 1F0
+              };
+              #endif  /* defined(SYSTEM_USE_MDIN325)||defined(SYSTEM_USE_MDIN325A)||defined(SYSTEM_USE_MDIN380) */
+ 884          
+ 885          // -----------------------------------------------------------------------------
+ 886          // Exported function Prototype
+ 887          // -----------------------------------------------------------------------------
+ 888          
+ 889          /*  FILE_END_HERE */
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   ----    ----
+   CONSTANT SIZE    =   2360    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,1 @@
+"src\xmodem.c" LARGE OPTIMIZE (9,SIZE) BROWSE DEBUG OBJECTEXTEND PRINT(.\lst\xmodem.lst) TABS (2) OBJECT(.\obj\xmodem.obj)

@@ -1,0 +1,537 @@
+C51 COMPILER V9.56.0.0   TP9951_MIPI_SETTING                                               12/10/2020 12:40:04 PAGE 1   
+
+
+C51 COMPILER V9.56.0.0, COMPILATION OF MODULE TP9951_MIPI_SETTING
+OBJECT MODULE PLACED IN .\obj\tp9951_MIPI_setting.obj
+COMPILER INVOKED BY: C:\Program Files\C51\BIN\C51.EXE ..\..\TP2860\tp9951_MIPI_setting.c LARGE OPTIMIZE(9,SIZE) BROWSE D
+                    -EBUG OBJECTEXTEND PRINT(.\lst\tp9951_MIPI_setting.lst) TABS(2) OBJECT(.\obj\tp9951_MIPI_setting.obj)
+
+line level    source
+
+   1          /*
+   2          2020-12-07
+   3          1.first release
+   4          
+   5          2020-12-10
+   6          1.update AHD new setting
+   7          2.add CVBS 720H support  
+   8          
+   9          */
+  10          
+  11          #define CVBS_960H 1 //1->960H 0->720H
+  12          extern void tp9951_write_reg(unsigned char, unsigned char);
+  13          enum{
+  14              VIN1=0,
+  15              VIN2=1,
+  16              VIN3=2,
+  17              VIN4=3,
+  18          };
+  19          enum{
+  20              STD_TVI,
+  21              STD_HDA, //AHD
+  22          };
+  23          enum{
+  24              PAL,
+  25              NTSC,
+  26              HD25,
+  27              HD30,
+  28              FHD25,
+  29              FHD30,
+  30          };
+  31          /////////////////////////////////////////////////////
+  32          void TP9951_mipi_out(unsigned char fmt, unsigned char std)
+  33          {
+  34   1        //mipi setting
+  35   1        tp9951_write_reg(0x40, 0x08); //select decoder page
+  36   1        tp9951_write_reg(0x02, 0x79);
+  37   1        tp9951_write_reg(0x03, 0x71);
+  38   1        tp9951_write_reg(0x04, 0x71);
+  39   1        tp9951_write_reg(0x13, 0xef); 
+  40   1        tp9951_write_reg(0x20, 0x00); 
+  41   1        tp9951_write_reg(0x21, 0x12);
+  42   1        tp9951_write_reg(0x23, 0x9e);
+  43   1        
+  44   1        if(FHD30 == fmt || FHD25 == fmt)
+  45   1        {
+  46   2          if(STD_HDA == std)
+  47   2          { 
+  48   3            tp9951_write_reg(0x14, 0x40);
+  49   3            tp9951_write_reg(0x15, 0x05); 
+  50   3          }
+  51   2          else
+  52   2          {
+  53   3            tp9951_write_reg(0x14, 0x41);
+  54   3            tp9951_write_reg(0x15, 0x02);     
+C51 COMPILER V9.56.0.0   TP9951_MIPI_SETTING                                               12/10/2020 12:40:04 PAGE 2   
+
+  55   3          }     
+  56   2          tp9951_write_reg(0x2a, 0x08);
+  57   2          tp9951_write_reg(0x2b, 0x04);
+  58   2          tp9951_write_reg(0x2c, 0x0c);
+  59   2          tp9951_write_reg(0x2e, 0x02);       
+  60   2        }
+  61   1        else if(HD30 == fmt || HD25 == fmt)
+  62   1        {
+  63   2          if(STD_HDA == std)
+  64   2          { 
+  65   3            tp9951_write_reg(0x14, 0x50);
+  66   3            tp9951_write_reg(0x15, 0x09); 
+  67   3          }
+  68   2          else
+  69   2          {
+  70   3            tp9951_write_reg(0x14, 0x41);
+  71   3            tp9951_write_reg(0x15, 0x02);     
+  72   3          }     
+  73   2            
+  74   2          tp9951_write_reg(0x2a, 0x08);
+  75   2          tp9951_write_reg(0x2b, 0x01);
+  76   2          tp9951_write_reg(0x2c, 0x0e);
+  77   2          tp9951_write_reg(0x2e, 0x02);         
+  78   2        }
+  79   1          
+  80   1        else if(NTSC == fmt || PAL == fmt)
+  81   1        {
+  82   2          tp9951_write_reg(0x14, 0x62);
+  83   2          tp9951_write_reg(0x15, 0x07); 
+  84   2            
+  85   2          tp9951_write_reg(0x2a, 0x08);
+  86   2          tp9951_write_reg(0x2b, 0x01);
+  87   2          tp9951_write_reg(0x2c, 0x0e);
+  88   2          tp9951_write_reg(0x2e, 0x02);           
+  89   2        }
+  90   1        
+  91   1        tp9951_write_reg(0x10, 0xa0);
+  92   1        tp9951_write_reg(0x10, 0x20);
+  93   1        /* Enable MIPI CSI2 output */
+  94   1        tp9951_write_reg(0x28, 0x02); 
+  95   1        tp9951_write_reg(0x28, 0x00); 
+  96   1        tp9951_write_reg(0x40, 0x00); //back to decoder page
+  97   1      }
+  98          /////////////////////////////////
+  99          //ch: video channel
+ 100          //fmt: PAL/NTSC/HD25/HD30
+ 101          //std: STD_TVI/STD_HDA
+ 102          //sample: TP9951_sensor_init(VIN1,HD30,STD_TVI); //video is TVI 720p30 from Vin1
+ 103          ////////////////////////////////
+ 104          void TP9951_sensor_init(unsigned char ch,unsigned char fmt,unsigned char std)
+ 105          {
+ 106   1        
+ 107   1        tp9951_write_reg(0x40, 0x00); //select decoder page
+ 108   1        tp9951_write_reg(0x42, 0x00); //common setting for all format 
+ 109   1        tp9951_write_reg(0x4e, 0x00); //common setting for MIPI output
+ 110   1        tp9951_write_reg(0x54, 0x00); //common setting for MIPI output
+ 111   1        tp9951_write_reg(0x41, ch);   //video MUX select
+ 112   1        
+ 113   1        if(PAL == fmt)
+ 114   1        {
+ 115   2      #if CVBS_960H 
+ 116   2          tp9951_write_reg(0x02, 0x47);
+C51 COMPILER V9.56.0.0   TP9951_MIPI_SETTING                                               12/10/2020 12:40:04 PAGE 3   
+
+ 117   2          tp9951_write_reg(0x0c, 0x13); 
+ 118   2          tp9951_write_reg(0x0d, 0x51);  
+ 119   2      
+ 120   2          tp9951_write_reg(0x15, 0x13);
+ 121   2          tp9951_write_reg(0x16, 0x76); 
+ 122   2          tp9951_write_reg(0x17, 0x80); 
+ 123   2          tp9951_write_reg(0x18, 0x17);
+ 124   2          tp9951_write_reg(0x19, 0x20);
+ 125   2          tp9951_write_reg(0x1a, 0x17);       
+ 126   2          tp9951_write_reg(0x1c, 0x09);
+ 127   2          tp9951_write_reg(0x1d, 0x48);
+ 128   2        
+ 129   2          tp9951_write_reg(0x20, 0x48);  
+ 130   2          tp9951_write_reg(0x21, 0x84); 
+ 131   2          tp9951_write_reg(0x22, 0x37);
+ 132   2          tp9951_write_reg(0x23, 0x3f);
+ 133   2      
+ 134   2          tp9951_write_reg(0x2b, 0x70);  
+ 135   2          tp9951_write_reg(0x2c, 0x2a); 
+ 136   2          tp9951_write_reg(0x2d, 0x64);
+ 137   2          tp9951_write_reg(0x2e, 0x56);
+ 138   2      
+ 139   2          tp9951_write_reg(0x30, 0x7a);  
+ 140   2          tp9951_write_reg(0x31, 0x4a); 
+ 141   2          tp9951_write_reg(0x32, 0x4d);
+ 142   2          tp9951_write_reg(0x33, 0xf0); 
+ 143   2          
+ 144   2          tp9951_write_reg(0x35, 0x65); 
+ 145   2          tp9951_write_reg(0x38, 0x00);       
+ 146   2          tp9951_write_reg(0x39, 0x04); 
+ 147   2            
+ 148   2      #else //PAL 720H
+              
+                  tp9951_write_reg(0x02, 0x47);
+                  tp9951_write_reg(0x0c, 0x13); 
+                  tp9951_write_reg(0x0d, 0x51);  
+              
+                  tp9951_write_reg(0x15, 0x03);
+                  tp9951_write_reg(0x16, 0xf0); 
+                  tp9951_write_reg(0x17, 0xa0); 
+                  tp9951_write_reg(0x18, 0x17);
+                  tp9951_write_reg(0x19, 0x20);
+                  tp9951_write_reg(0x1a, 0x15);       
+                  tp9951_write_reg(0x1c, 0x06);
+                  tp9951_write_reg(0x1d, 0xc0);
+                
+                  tp9951_write_reg(0x20, 0x48);  
+                  tp9951_write_reg(0x21, 0x84); 
+                  tp9951_write_reg(0x22, 0x37);
+                  tp9951_write_reg(0x23, 0x3f);
+              
+                  tp9951_write_reg(0x2b, 0x70);  
+                  tp9951_write_reg(0x2c, 0x2a); 
+                  tp9951_write_reg(0x2d, 0x4b);
+                  tp9951_write_reg(0x2e, 0x56);
+              
+                  tp9951_write_reg(0x30, 0x7a);  
+                  tp9951_write_reg(0x31, 0x4a); 
+                  tp9951_write_reg(0x32, 0x4d);
+                  tp9951_write_reg(0x33, 0xfb); 
+                  
+                  tp9951_write_reg(0x35, 0x65); 
+C51 COMPILER V9.56.0.0   TP9951_MIPI_SETTING                                               12/10/2020 12:40:04 PAGE 4   
+
+                  tp9951_write_reg(0x38, 0x00);       
+                  tp9951_write_reg(0x39, 0x04);   
+              #endif      
+ 182   2        }
+ 183   1        else if(NTSC == fmt)
+ 184   1        {
+ 185   2      #if CVBS_960H   
+ 186   2          tp9951_write_reg(0x02, 0x47);
+ 187   2          tp9951_write_reg(0x0c, 0x13); 
+ 188   2          tp9951_write_reg(0x0d, 0x50);  
+ 189   2      
+ 190   2          tp9951_write_reg(0x15, 0x13);
+ 191   2          tp9951_write_reg(0x16, 0x60); 
+ 192   2          tp9951_write_reg(0x17, 0x80); 
+ 193   2          tp9951_write_reg(0x18, 0x12);
+ 194   2          tp9951_write_reg(0x19, 0xf0);
+ 195   2          tp9951_write_reg(0x1a, 0x07);       
+ 196   2          tp9951_write_reg(0x1c, 0x09);
+ 197   2          tp9951_write_reg(0x1d, 0x38);
+ 198   2        
+ 199   2          tp9951_write_reg(0x20, 0x40);  
+ 200   2          tp9951_write_reg(0x21, 0x84); 
+ 201   2          tp9951_write_reg(0x22, 0x36);
+ 202   2          tp9951_write_reg(0x23, 0x3c);
+ 203   2      
+ 204   2          tp9951_write_reg(0x2b, 0x70);  
+ 205   2          tp9951_write_reg(0x2c, 0x2a); 
+ 206   2          tp9951_write_reg(0x2d, 0x68);
+ 207   2          tp9951_write_reg(0x2e, 0x57);
+ 208   2      
+ 209   2          tp9951_write_reg(0x30, 0x62);  
+ 210   2          tp9951_write_reg(0x31, 0xbb); 
+ 211   2          tp9951_write_reg(0x32, 0x96);
+ 212   2          tp9951_write_reg(0x33, 0xc0);
+ 213   2          
+ 214   2          tp9951_write_reg(0x35, 0x65); 
+ 215   2          tp9951_write_reg(0x38, 0x00);     
+ 216   2          tp9951_write_reg(0x39, 0x04); 
+ 217   2          
+ 218   2      #else //NTSC 720H
+                  
+                  tp9951_write_reg(0x02, 0x47);
+                  tp9951_write_reg(0x0c, 0x13); 
+                  tp9951_write_reg(0x0d, 0x50);  
+              
+                  tp9951_write_reg(0x15, 0x03);
+                  tp9951_write_reg(0x16, 0xd6); 
+                  tp9951_write_reg(0x17, 0xa0); 
+                  tp9951_write_reg(0x18, 0x12);
+                  tp9951_write_reg(0x19, 0xf0);
+                  tp9951_write_reg(0x1a, 0x05);       
+                  tp9951_write_reg(0x1c, 0x06);
+                  tp9951_write_reg(0x1d, 0xb4);
+                
+                  tp9951_write_reg(0x20, 0x40);  
+                  tp9951_write_reg(0x21, 0x84); 
+                  tp9951_write_reg(0x22, 0x36);
+                  tp9951_write_reg(0x23, 0x3c);
+              
+                  tp9951_write_reg(0x2b, 0x70);  
+                  tp9951_write_reg(0x2c, 0x2a); 
+                  tp9951_write_reg(0x2d, 0x4b);
+C51 COMPILER V9.56.0.0   TP9951_MIPI_SETTING                                               12/10/2020 12:40:04 PAGE 5   
+
+                  tp9951_write_reg(0x2e, 0x57);
+              
+                  tp9951_write_reg(0x30, 0x62);  
+                  tp9951_write_reg(0x31, 0xbb); 
+                  tp9951_write_reg(0x32, 0x96);
+                  tp9951_write_reg(0x33, 0xcb);
+                  
+                  tp9951_write_reg(0x35, 0x65); 
+                  tp9951_write_reg(0x38, 0x00);     
+                  tp9951_write_reg(0x39, 0x04);       
+              #endif    
+ 252   2        }
+ 253   1        else if(HD25 == fmt)
+ 254   1        {
+ 255   2          tp9951_write_reg(0x02, 0x42);
+ 256   2          tp9951_write_reg(0x07, 0xc0); 
+ 257   2          tp9951_write_reg(0x0b, 0xc0);     
+ 258   2          tp9951_write_reg(0x0c, 0x13); 
+ 259   2          tp9951_write_reg(0x0d, 0x50);  
+ 260   2      
+ 261   2          tp9951_write_reg(0x15, 0x13);
+ 262   2          tp9951_write_reg(0x16, 0x15); 
+ 263   2          tp9951_write_reg(0x17, 0x00); 
+ 264   2          tp9951_write_reg(0x18, 0x19);
+ 265   2          tp9951_write_reg(0x19, 0xd0);
+ 266   2          tp9951_write_reg(0x1a, 0x25);     
+ 267   2          tp9951_write_reg(0x1c, 0x07);  //1280*720, 25fps
+ 268   2          tp9951_write_reg(0x1d, 0xbc);  //1280*720, 25fps
+ 269   2      
+ 270   2          tp9951_write_reg(0x20, 0x30);  
+ 271   2          tp9951_write_reg(0x21, 0x84); 
+ 272   2          tp9951_write_reg(0x22, 0x36);
+ 273   2          tp9951_write_reg(0x23, 0x3c);
+ 274   2      
+ 275   2          tp9951_write_reg(0x2b, 0x60);  
+ 276   2          tp9951_write_reg(0x2c, 0x0a); 
+ 277   2          tp9951_write_reg(0x2d, 0x30);
+ 278   2          tp9951_write_reg(0x2e, 0x70);
+ 279   2      
+ 280   2          tp9951_write_reg(0x30, 0x48);  
+ 281   2          tp9951_write_reg(0x31, 0xbb); 
+ 282   2          tp9951_write_reg(0x32, 0x2e);
+ 283   2          tp9951_write_reg(0x33, 0x90);
+ 284   2          
+ 285   2          tp9951_write_reg(0x35, 0x25); 
+ 286   2          tp9951_write_reg(0x38, 0x00); 
+ 287   2          tp9951_write_reg(0x39, 0x18); 
+ 288   2      
+ 289   2          if(STD_HDA == std)  //AHD720p25 extra
+ 290   2          {
+ 291   3            tp9951_write_reg(0x0d, 0x70);
+ 292   3      
+ 293   3            tp9951_write_reg(0x16, 0x16);
+ 294   3            tp9951_write_reg(0x1c, 0x87);
+ 295   3            tp9951_write_reg(0x1d, 0xba);
+ 296   3                        
+ 297   3            tp9951_write_reg(0x20, 0x38);
+ 298   3            tp9951_write_reg(0x21, 0x46);
+ 299   3      
+ 300   3            tp9951_write_reg(0x27, 0xad);
+ 301   3            
+ 302   3            tp9951_write_reg(0x2c, 0x3a);
+C51 COMPILER V9.56.0.0   TP9951_MIPI_SETTING                                               12/10/2020 12:40:04 PAGE 6   
+
+ 303   3            tp9951_write_reg(0x2d, 0x48);
+ 304   3            tp9951_write_reg(0x2e, 0x40);
+ 305   3      
+ 306   3            tp9951_write_reg(0x30, 0x4f);
+ 307   3            tp9951_write_reg(0x31, 0x10);
+ 308   3            tp9951_write_reg(0x32, 0x08);
+ 309   3            tp9951_write_reg(0x33, 0x40);
+ 310   3          } 
+ 311   2        }
+ 312   1        else if(HD30 == fmt)
+ 313   1        {
+ 314   2          tp9951_write_reg(0x02, 0x42);
+ 315   2          tp9951_write_reg(0x07, 0xc0); 
+ 316   2          tp9951_write_reg(0x0b, 0xc0);     
+ 317   2          tp9951_write_reg(0x0c, 0x13); 
+ 318   2          tp9951_write_reg(0x0d, 0x50);  
+ 319   2      
+ 320   2          tp9951_write_reg(0x15, 0x13);
+ 321   2          tp9951_write_reg(0x16, 0x15); 
+ 322   2          tp9951_write_reg(0x17, 0x00); 
+ 323   2          tp9951_write_reg(0x18, 0x19);
+ 324   2          tp9951_write_reg(0x19, 0xd0);
+ 325   2          tp9951_write_reg(0x1a, 0x25);     
+ 326   2          tp9951_write_reg(0x1c, 0x06);  //1280*720, 30fps
+ 327   2          tp9951_write_reg(0x1d, 0x72);  //1280*720, 30fps
+ 328   2      
+ 329   2          tp9951_write_reg(0x20, 0x30);  
+ 330   2          tp9951_write_reg(0x21, 0x84); 
+ 331   2          tp9951_write_reg(0x22, 0x36);
+ 332   2          tp9951_write_reg(0x23, 0x3c);
+ 333   2      
+ 334   2          tp9951_write_reg(0x2b, 0x60);  
+ 335   2          tp9951_write_reg(0x2c, 0x0a); 
+ 336   2          tp9951_write_reg(0x2d, 0x30);
+ 337   2          tp9951_write_reg(0x2e, 0x70);
+ 338   2      
+ 339   2          tp9951_write_reg(0x30, 0x48);  
+ 340   2          tp9951_write_reg(0x31, 0xbb); 
+ 341   2          tp9951_write_reg(0x32, 0x2e);
+ 342   2          tp9951_write_reg(0x33, 0x90);
+ 343   2          
+ 344   2          tp9951_write_reg(0x35, 0x25); 
+ 345   2          tp9951_write_reg(0x38, 0x00); 
+ 346   2          tp9951_write_reg(0x39, 0x18); 
+ 347   2      
+ 348   2          if(STD_HDA == std) //AHD720p30 extra
+ 349   2          {
+ 350   3            tp9951_write_reg(0x0d, 0x70);
+ 351   3            
+ 352   3            tp9951_write_reg(0x16, 0x16);
+ 353   3            tp9951_write_reg(0x1c, 0x86);
+ 354   3            tp9951_write_reg(0x1d, 0x70);
+ 355   3            
+ 356   3            tp9951_write_reg(0x20, 0x38);
+ 357   3            tp9951_write_reg(0x21, 0x46);
+ 358   3      
+ 359   3            tp9951_write_reg(0x27, 0xad);
+ 360   3      
+ 361   3            tp9951_write_reg(0x2c, 0x3a);
+ 362   3            tp9951_write_reg(0x2d, 0x48);
+ 363   3            tp9951_write_reg(0x2e, 0x40);
+ 364   3      
+C51 COMPILER V9.56.0.0   TP9951_MIPI_SETTING                                               12/10/2020 12:40:04 PAGE 7   
+
+ 365   3            tp9951_write_reg(0x30, 0x4e);
+ 366   3            tp9951_write_reg(0x31, 0xe5);
+ 367   3            tp9951_write_reg(0x32, 0x00);
+ 368   3            tp9951_write_reg(0x33, 0xf0);
+ 369   3          } 
+ 370   2        }
+ 371   1        else if(FHD30 == fmt)
+ 372   1        { 
+ 373   2            tp9951_write_reg(0x02, 0x40);
+ 374   2            tp9951_write_reg(0x07, 0xc0); 
+ 375   2            tp9951_write_reg(0x0b, 0xc0);     
+ 376   2            tp9951_write_reg(0x0c, 0x03); 
+ 377   2            tp9951_write_reg(0x0d, 0x50);  
+ 378   2      
+ 379   2            tp9951_write_reg(0x15, 0x03);
+ 380   2            tp9951_write_reg(0x16, 0xd2); 
+ 381   2            tp9951_write_reg(0x17, 0x80); 
+ 382   2            tp9951_write_reg(0x18, 0x29);
+ 383   2            tp9951_write_reg(0x19, 0x38);
+ 384   2            tp9951_write_reg(0x1a, 0x47);       
+ 385   2            tp9951_write_reg(0x1c, 0x08);  //1920*1080, 30fps
+ 386   2            tp9951_write_reg(0x1d, 0x98);  //
+ 387   2        
+ 388   2            tp9951_write_reg(0x20, 0x30);  
+ 389   2            tp9951_write_reg(0x21, 0x84); 
+ 390   2            tp9951_write_reg(0x22, 0x36);
+ 391   2            tp9951_write_reg(0x23, 0x3c);
+ 392   2      
+ 393   2            tp9951_write_reg(0x2b, 0x60);  
+ 394   2            tp9951_write_reg(0x2c, 0x0a); 
+ 395   2            tp9951_write_reg(0x2d, 0x30);
+ 396   2            tp9951_write_reg(0x2e, 0x70);
+ 397   2      
+ 398   2            tp9951_write_reg(0x30, 0x48);  
+ 399   2            tp9951_write_reg(0x31, 0xbb); 
+ 400   2            tp9951_write_reg(0x32, 0x2e);
+ 401   2            tp9951_write_reg(0x33, 0x90);
+ 402   2            
+ 403   2            tp9951_write_reg(0x35, 0x05);
+ 404   2            tp9951_write_reg(0x38, 0x00); 
+ 405   2            tp9951_write_reg(0x39, 0x1C);   
+ 406   2        
+ 407   2            if(STD_HDA == std) //AHD1080p30 extra
+ 408   2            {
+ 409   3              tp9951_write_reg(0x0d, 0x70);
+ 410   3          
+ 411   3              tp9951_write_reg(0x15, 0x01);
+ 412   3              tp9951_write_reg(0x16, 0xf0);
+ 413   3              tp9951_write_reg(0x1c, 0x88);
+ 414   3              tp9951_write_reg(0x1d, 0x96);
+ 415   3                  
+ 416   3              tp9951_write_reg(0x20, 0x38);
+ 417   3              tp9951_write_reg(0x21, 0x46);
+ 418   3      
+ 419   3              tp9951_write_reg(0x27, 0xad);
+ 420   3      
+ 421   3              tp9951_write_reg(0x2c, 0x3a);
+ 422   3              tp9951_write_reg(0x2d, 0x48);
+ 423   3              tp9951_write_reg(0x2e, 0x40);
+ 424   3      
+ 425   3              tp9951_write_reg(0x30, 0x52);
+ 426   3              tp9951_write_reg(0x31, 0xca);
+C51 COMPILER V9.56.0.0   TP9951_MIPI_SETTING                                               12/10/2020 12:40:04 PAGE 8   
+
+ 427   3              tp9951_write_reg(0x32, 0xf0);
+ 428   3              tp9951_write_reg(0x33, 0x20);
+ 429   3              
+ 430   3              tp9951_write_reg(0x35, 0x25);       
+ 431   3            }
+ 432   2          }
+ 433   1          else if(FHD25 == fmt)
+ 434   1          {
+ 435   2            tp9951_write_reg(0x02, 0x40);
+ 436   2            tp9951_write_reg(0x07, 0xc0); 
+ 437   2            tp9951_write_reg(0x0b, 0xc0);     
+ 438   2            tp9951_write_reg(0x0c, 0x03); 
+ 439   2            tp9951_write_reg(0x0d, 0x50);  
+ 440   2            
+ 441   2            tp9951_write_reg(0x15, 0x03);
+ 442   2            tp9951_write_reg(0x16, 0xd2); 
+ 443   2            tp9951_write_reg(0x17, 0x80); 
+ 444   2            tp9951_write_reg(0x18, 0x29);
+ 445   2            tp9951_write_reg(0x19, 0x38);
+ 446   2            tp9951_write_reg(0x1a, 0x47);       
+ 447   2            
+ 448   2            tp9951_write_reg(0x1c, 0x0a);  //1920*1080, 25fps
+ 449   2            tp9951_write_reg(0x1d, 0x50);  //
+ 450   2            
+ 451   2            tp9951_write_reg(0x20, 0x30);  
+ 452   2            tp9951_write_reg(0x21, 0x84); 
+ 453   2            tp9951_write_reg(0x22, 0x36);
+ 454   2            tp9951_write_reg(0x23, 0x3c);
+ 455   2            
+ 456   2            tp9951_write_reg(0x2b, 0x60);  
+ 457   2            tp9951_write_reg(0x2c, 0x0a); 
+ 458   2            tp9951_write_reg(0x2d, 0x30);
+ 459   2            tp9951_write_reg(0x2e, 0x70);
+ 460   2            
+ 461   2            tp9951_write_reg(0x30, 0x48);  
+ 462   2            tp9951_write_reg(0x31, 0xbb); 
+ 463   2            tp9951_write_reg(0x32, 0x2e);
+ 464   2            tp9951_write_reg(0x33, 0x90);
+ 465   2                
+ 466   2            tp9951_write_reg(0x35, 0x05);
+ 467   2            tp9951_write_reg(0x38, 0x00); 
+ 468   2            tp9951_write_reg(0x39, 0x1C);   
+ 469   2      
+ 470   2            if(STD_HDA == std)  //AHD1080p25 extra                   
+ 471   2            {                                     
+ 472   3              tp9951_write_reg(0x0d, 0x70);
+ 473   3              
+ 474   3              tp9951_write_reg(0x15, 0x01);
+ 475   3              tp9951_write_reg(0x16, 0xf0);
+ 476   3              tp9951_write_reg(0x1c, 0x8a);
+ 477   3              tp9951_write_reg(0x1d, 0x4e);
+ 478   3                      
+ 479   3              tp9951_write_reg(0x20, 0x3c);
+ 480   3              tp9951_write_reg(0x21, 0x46);
+ 481   3              
+ 482   3              tp9951_write_reg(0x27, 0xad);
+ 483   3              
+ 484   3              tp9951_write_reg(0x2c, 0x3a);
+ 485   3              tp9951_write_reg(0x2d, 0x48);
+ 486   3              tp9951_write_reg(0x2e, 0x40);
+ 487   3              
+ 488   3              tp9951_write_reg(0x30, 0x52);
+C51 COMPILER V9.56.0.0   TP9951_MIPI_SETTING                                               12/10/2020 12:40:04 PAGE 9   
+
+ 489   3              tp9951_write_reg(0x31, 0xc3);
+ 490   3              tp9951_write_reg(0x32, 0x7d);
+ 491   3              tp9951_write_reg(0x33, 0xa0);
+ 492   3              
+ 493   3              tp9951_write_reg(0x35, 0x25);               
+ 494   3            }     
+ 495   2          }
+ 496   1        TP9951_mipi_out(fmt, std);
+ 497   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1548    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----       5
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

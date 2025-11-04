@@ -1,0 +1,1349 @@
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MDINAUX
+OBJECT MODULE PLACED IN .\obj\mdinaux.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE src\MDIN3xx\mdinaux.c LARGE OPTIMIZE(9,SIZE) BROWSE DEBUG OBJECTEXTEND P
+                    -RINT(.\lst\mdinaux.lst) TABS(2) OBJECT(.\obj\mdinaux.obj)
+
+line level    source
+
+   1          //--------------------------------------------------------------------------------------------------------
+             ---------------
+   2          // (C) Copyright 2008  Macro Image Technology Co., LTd. , All rights reserved
+   3          // 
+   4          // This source code is the property of Macro Image Technology and is provided
+   5          // pursuant to a Software License Agreement. This code's reuse and distribution
+   6          // without Macro Image Technology's permission is strictly limited by the confidential
+   7          // information provisions of the Software License Agreement.
+   8          //--------------------------------------------------------------------------------------------------------
+             ----------------
+   9          //
+  10          // File Name      : MDINAUX.C
+  11          // Description    :
+  12          // Ref. Docment   : 
+  13          // Revision History   :
+  14          
+  15          // ----------------------------------------------------------------------
+  16          // Include files
+  17          // ----------------------------------------------------------------------
+  18          #include  <string.h>
+  19          #include  "mdin3xx.h"
+  20          
+  21          #if __MDIN3xx_DBGPRT__ == 1
+              #include  "..\inc\printf.h" // for printf
+              #endif
+  24          
+  25          // -----------------------------------------------------------------------------
+  26          // Struct/Union Types and define
+  27          // -----------------------------------------------------------------------------
+  28          
+  29          // ----------------------------------------------------------------------
+  30          // Static Global Data section variables
+  31          // ----------------------------------------------------------------------
+  32          static WORD xpll_S = 0, xpll_F = 0, xpll_T = 0;
+  33          
+  34          // ----------------------------------------------------------------------
+  35          // External Variable 
+  36          // ----------------------------------------------------------------------
+  37          
+  38          // ----------------------------------------------------------------------
+  39          // Static Prototype Functions
+  40          // ----------------------------------------------------------------------
+  41          
+  42          // ----------------------------------------------------------------------
+  43          // Static functions
+  44          // ----------------------------------------------------------------------
+  45          
+  46          //--------------------------------------------------------------------------------------------------------
+             -------------------
+  47          MDIN_ERROR_t MDINAUX_SetVideoPLL(WORD S, WORD F, WORD T)
+  48          {
+  49   1      //  division ratio = (S+F/T) or (S+1-F/T)
+  50   1        if (xpll_S==S&&xpll_F==F&&xpll_T==T) return MDIN_NO_ERROR;
+  51   1      
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 2   
+
+  52   1        if (MDINHIF_RegField(MDIN_HOST_ID, 0x035, 0,  8, T)) return MDIN_I2C_ERROR; // T parameter
+  53   1        if (MDINHIF_RegField(MDIN_HOST_ID, 0x036, 0, 13, F)) return MDIN_I2C_ERROR; // F parameter
+  54   1        if (MDINHIF_RegField(MDIN_HOST_ID, 0x042, 10, 6, S)) return MDIN_I2C_ERROR; // S parameter
+  55   1      
+  56   1        xpll_S = S; xpll_F = F; xpll_T = T;
+  57   1        return MDIN_NO_ERROR;
+  58   1      }
+  59          
+  60          //--------------------------------------------------------------------------------------------------------
+             -------------------
+  61          static MDIN_ERROR_t MDINAUX_SetSrcVideoFrmt(PMDIN_VIDEO_INFO pINFO)
+  62          {
+  63   1        WORD mode, nID;
+  64   1        PMDIN_SRCVIDEO_INFO pSRC = (PMDIN_SRCVIDEO_INFO)&pINFO->stSRC_x;
+  65   1      
+  66   1        // set InPort
+  67   1        pSRC->stATTB.attb &= ~(MDIN_USE_INPORT_M|MDIN_USE_INPORT_A);
+  68   1        switch (pINFO->srcPATH) {
+  69   2          case PATH_MAIN_A_AUX_A: case PATH_MAIN_B_AUX_A:
+  70   2            memcpy((PBYTE)&pSRC->stATTB, (PBYTE)&pINFO->stSRC_a.stATTB, sizeof(MDIN_SRCVIDEO_ATTB));
+  71   2            pSRC->frmt = pINFO->stSRC_a.frmt; pSRC->mode = pINFO->stSRC_a.mode;
+  72   2            pSRC->stATTB.attb |=  MDIN_USE_INPORT_A; mode = nID = 2; break;
+  73   2      
+  74   2          case PATH_MAIN_A_AUX_B: case PATH_MAIN_B_AUX_B:
+  75   2            memcpy((PBYTE)&pSRC->stATTB, (PBYTE)&pINFO->stSRC_b.stATTB, sizeof(MDIN_SRCVIDEO_ATTB));
+  76   2            pSRC->frmt = pINFO->stSRC_b.frmt; pSRC->mode = pINFO->stSRC_b.mode;
+  77   2            pSRC->stATTB.attb |=  MDIN_USE_INPORT_B; mode = nID = 3; break;
+  78   2      
+  79   2          default:
+  80   2            memcpy((PBYTE)&pSRC->stATTB, (PBYTE)&pINFO->stOUT_m.stATTB, sizeof(MDIN_OUTVIDEO_ATTB));
+  81   2            pSRC->frmt = pINFO->stOUT_m.frmt; pSRC->mode = pINFO->stOUT_m.mode;
+  82   2            pSRC->stATTB.attb |=  MDIN_USE_INPORT_M; mode = nID = 0; break;
+  83   2        }
+  84   1      
+  85   1        mode |= (nID)? 0 : ((MBIT(pSRC->stATTB.attb,MDIN_NEGATIVE_HACT))? (1<<7) : 0);
+  86   1        mode |= (nID)? 0 : ((MBIT(pSRC->stATTB.attb,MDIN_NEGATIVE_VACT))? (1<<6) : 0);
+  87   1        mode |= ((MBIT(pSRC->fine,MDIN_HIGH_IS_TOPFLD))?          (1<<5) : 0);
+  88   1        mode |= ((MBIT(pSRC->fine,MDIN_CbCrSWAP_ON))?           (1<<4) : 0);
+  89   1        mode |= ((MBIT(pSRC->stATTB.attb,MDIN_PIXELSIZE_422))?        (1<<3) : 0);
+  90   1        mode |= ((MBIT(pSRC->stATTB.attb,MDIN_SCANTYPE_PROG))?        (1<<2) : 0);
+  91   1      
+  92   1        // aux_input_ctrl
+  93   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x140, mode)) return MDIN_I2C_ERROR;
+  94   1        return MDIN_NO_ERROR;
+  95   1      }
+  96          
+  97          //--------------------------------------------------------------------------------------------------------
+             -------------------
+  98          static MDIN_ERROR_t MDINAUX_SetOutVideoFrmt(PMDIN_VIDEO_INFO pINFO)
+  99          {
+ 100   1        WORD mode = 0;
+ 101   1        PMDIN_OUTVIDEO_INFO pOUT = (PMDIN_OUTVIDEO_INFO)&pINFO->stOUT_x;
+ 102   1      
+ 103   1        if (pOUT->frmt>=VIDOUT_FORMAT_END) return MDIN_INVALID_FORMAT;
+ 104   1      
+ 105   1        // set attb[H/V-Polarity,ScanType], H/V size
+ 106   1        memcpy(&pOUT->stATTB, (PBYTE)&defMDINOutVideo[pOUT->frmt], sizeof(MDIN_OUTVIDEO_ATTB));
+ 107   1      
+ 108   1        switch (pINFO->dacPATH) {
+ 109   2          case DAC_PATH_MAIN_PIP:   // get frmt, mode and stATTB of main outvideo
+ 110   2            memcpy(&pOUT->stATTB, (PBYTE)&pINFO->stOUT_m.stATTB, sizeof(MDIN_OUTVIDEO_ATTB));
+ 111   2            pOUT->frmt = pINFO->stOUT_m.frmt; pOUT->mode = pINFO->stOUT_m.mode; break;
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 3   
+
+ 112   2        }
+ 113   1      
+ 114   1        // set Quality, System
+ 115   1        pOUT->stATTB.attb &= ~(MDIN_QUALITY_HD|MDIN_VIDEO_SYSTEM);
+ 116   1        switch (pOUT->frmt) {
+ 117   2          case VIDOUT_720x480i60:   case VIDOUT_720x576i50:
+ 118   2          case VIDOUT_720x480p60:   case VIDOUT_720x576p50:
+ 119   2            pOUT->stATTB.attb |= (MDIN_QUALITY_SD|MDIN_VIDEO_SYSTEM); break;
+ 120   2          case VIDOUT_1280x720p60:  case VIDOUT_1280x720p59:  case VIDOUT_1280x720p50:
+ 121   2          case VIDOUT_1280x720p30:  case VIDOUT_1280x720p25:  case VIDOUT_1280x720p24:
+ 122   2            pOUT->stATTB.attb |= (MDIN_QUALITY_HD|MDIN_VIDEO_SYSTEM); break;
+ 123   2          case VIDOUT_1920x1080i60: case VIDOUT_1920x1080i59: case VIDOUT_1920x1080i50:
+ 124   2          case VIDOUT_1920x1080p60: case VIDOUT_1920x1080p59: case VIDOUT_1920x1080p50:
+ 125   2          case VIDOUT_1920x1080p30: case VIDOUT_1920x1080p25: case VIDOUT_1920x1080p24:
+ 126   2            pOUT->stATTB.attb |= (MDIN_QUALITY_HD|MDIN_VIDEO_SYSTEM); break;
+ 127   2      /*
+ 128   2        #if defined(SYSTEM_USE_MDIN325)||defined(SYSTEM_USE_MDIN325A)||defined(SYSTEM_USE_MDIN380)
+ 129   2          case VIDOUT_CVIDEO_NTSC:  case VIDOUT_CVIDEO_PAL:
+ 130   2            pOUT->stATTB.attb |= (MDIN_QUALITY_SD|MDIN_VIDEO_SYSTEM); break;
+ 131   2        #endif
+ 132   2      */
+ 133   2          default:
+ 134   2            pOUT->stATTB.attb |= (MDIN_QUALITY_SD|MDIN_PCVGA_SYSTEM); break;
+ 135   2        }
+ 136   1      
+ 137   1        // set Precision, PixelSize, ColorSpace
+ 138   1        pOUT->stATTB.attb &= ~(MDIN_PRECISION_8|MDIN_PIXELSIZE_422|MDIN_COLORSPACE_YUV);
+ 139   1        switch (pOUT->mode) {
+ 140   2          case MDIN_OUT_RGB444_8:   mode = (0<<11)|(0<<7)|(1<<3);
+ 141   2            pOUT->stATTB.attb |= (MDIN_PRECISION_8|MDIN_PIXELSIZE_444|MDIN_COLORSPACE_RGB); break;
+ 142   2          case MDIN_OUT_YUV444_8:   mode = (1<<11)|(0<<7)|(0<<3);
+ 143   2            pOUT->stATTB.attb |= (MDIN_PRECISION_8|MDIN_PIXELSIZE_444|MDIN_COLORSPACE_YUV); break;
+ 144   2          case MDIN_OUT_EMB422_8:   mode = (1<<11)|(2<<7)|(0<<3);
+ 145   2            pOUT->stATTB.attb |= (MDIN_PRECISION_8|MDIN_PIXELSIZE_422|MDIN_COLORSPACE_YUV); break;
+ 146   2          case MDIN_OUT_SEP422_8:   mode = (1<<11)|(0<<7)|(0<<3);
+ 147   2            pOUT->stATTB.attb |= (MDIN_PRECISION_8|MDIN_PIXELSIZE_422|MDIN_COLORSPACE_YUV); break;
+ 148   2          case MDIN_OUT_EMB422_10:  mode = (1<<11)|(2<<7)|(0<<3);
+ 149   2            pOUT->stATTB.attb |= (MDIN_PRECISION_10|MDIN_PIXELSIZE_422|MDIN_COLORSPACE_YUV); break;
+ 150   2          case MDIN_OUT_SEP422_10:  mode = (1<<11)|(0<<7)|(0<<3);
+ 151   2            pOUT->stATTB.attb |= (MDIN_PRECISION_10|MDIN_PIXELSIZE_422|MDIN_COLORSPACE_YUV); break;
+ 152   2          case MDIN_OUT_MUX656_8:   mode = (1<<11)|(3<<7)|(0<<3);
+ 153   2            pOUT->stATTB.attb |= (MDIN_PRECISION_8|MDIN_PIXELSIZE_422|MDIN_COLORSPACE_YUV); break;
+ 154   2          case MDIN_OUT_MUX656_10:  mode = (1<<11)|(3<<7)|(0<<3);
+ 155   2            pOUT->stATTB.attb |= (MDIN_PRECISION_10|MDIN_PIXELSIZE_422|MDIN_COLORSPACE_YUV); break;
+ 156   2        }
+ 157   1      /*
+ 158   1      #if defined(SYSTEM_USE_MDIN325)||defined(SYSTEM_USE_MDIN325A)||defined(SYSTEM_USE_MDIN380)
+ 159   1        if (pOUT->frmt==VIDOUT_CVIDEO_NTSC||pOUT->frmt==VIDOUT_CVIDEO_PAL) {
+ 160   1            mode = (1<<11)|(3<<7);    // same MDIN_OUT_MUX656_8
+ 161   1            pOUT->stATTB.attb |= (MDIN_PRECISION_8|MDIN_PIXELSIZE_422|MDIN_COLORSPACE_YUV);
+ 162   1        }
+ 163   1      #endif
+ 164   1      */
+ 165   1        // for 4-CH input mode, 2-HD input mode
+ 166   1        if (pINFO->dacPATH==DAC_PATH_AUX_4CH||pINFO->dacPATH==DAC_PATH_AUX_2HD) mode |= (1<<8); // aux_digital_sy
+             -nc_en
+ 167   1      
+ 168   1        // aux_out_ctrl
+ 169   1        mode |= (RBIT(pOUT->stATTB.attb,MDIN_PIXELSIZE_422))? (1<<15) : 0;
+ 170   1        mode |= (MBIT(pOUT->stATTB.attb,MDIN_POSITIVE_HSYNC))?  (1<<14) : 0;
+ 171   1        mode |= (MBIT(pOUT->stATTB.attb,MDIN_POSITIVE_VSYNC))?  (1<<13) : 0;
+ 172   1        mode |= (MBIT(pOUT->fine,MDIN_HSYNC_IS_DE))?      (1<<12) : 0;
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 4   
+
+ 173   1        mode |= (MBIT(pOUT->fine,MDIN_CbCrSWAP_ON))?      (1<< 6) : 0;
+ 174   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x145, mode)) return MDIN_I2C_ERROR;
+ 175   1      
+ 176   1        // aux_sync_level
+ 177   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x146, 0x0000)) return MDIN_I2C_ERROR;
+ 178   1        return MDIN_NO_ERROR;
+ 179   1      }
+ 180          
+ 181          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 182          static MDIN_ERROR_t MDINAUX_SetSrcVideoCSC(PMDIN_VIDEO_INFO pINFO)
+ 183          {
+ 184   1        PMDIN_SRCVIDEO_INFO pSRC = (PMDIN_SRCVIDEO_INFO)&pINFO->stSRC_x;
+ 185   1        PMDIN_OUTVIDEO_INFO pOUT = (PMDIN_OUTVIDEO_INFO)&pINFO->stOUT_x;
+ 186   1        WORD i; MDIN_CSCCTRL_INFO stCSC, *pCSC;
+ 187   1      
+ 188   1      #if SOURCE_CSC_STD_RANGE == 1
+                if (pSRC->stATTB.attb&MDIN_COLORSPACE_YUV) {
+                  if (pOUT->stATTB.attb&MDIN_COLORSPACE_YUV)
+                     pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscBypass_StdRange; // YUV(HD or SD) to YUV(HD or SD)
+                  else pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscBypass_StdRange; // YUV(HD or SD) to RGB(HD or SD)
+                }   
+                else if (pSRC->stATTB.attb&MDIN_QUALITY_HD) {
+                  if (pOUT->stATTB.attb&MDIN_COLORSPACE_YUV)
+                     pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscRGBtoYUV_HD_StdRange;  // RGB(HD) to YUV(HD or SD)
+                  else pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscRGBtoYUV_HD_StdRange;  // RGB(HD) to RGB(HD or SD)
+                }
+                else {
+                  if (pOUT->stATTB.attb&MDIN_COLORSPACE_YUV)
+                     pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscRGBtoYUV_SD_StdRange;  // RGB(SD) to YUV(HD or SD)
+                  else pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscRGBtoYUV_SD_StdRange;  // RGB(SD) to RGB(HD or SD)
+                }
+              #else /* SOURCE_CSC_STD_RANGE == 0 */
+ 205   1        if (pSRC->stATTB.attb&MDIN_COLORSPACE_YUV) {
+ 206   2          if (pOUT->stATTB.attb&MDIN_COLORSPACE_YUV)
+ 207   2             pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscBypass_StdRange; // YUV(HD or SD) to YUV(HD or SD)
+ 208   2          else pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscBypass_StdRange; // YUV(HD or SD) to RGB(HD or SD)
+ 209   2        }
+ 210   1        else if (pSRC->stATTB.attb&MDIN_QUALITY_HD) {
+ 211   2          if (pOUT->stATTB.attb&MDIN_COLORSPACE_YUV)
+ 212   2             pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscRGBtoYUV_HD_FullRange; // RGB(HD) to YUV(HD or SD) // modified on 
+             -16Aug2012
+ 213   2          else pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscRGBtoYUV_HD_FullRange; // RGB(HD) to RGB(HD or SD)
+ 214   2        }
+ 215   1        else {
+ 216   2          if (pOUT->stATTB.attb&MDIN_COLORSPACE_YUV)
+ 217   2             pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscRGBtoYUV_SD_FullRange; // RGB(SD) to YUV(HD or SD) // modified on 
+             -16Aug2012
+ 218   2          else pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscRGBtoYUV_SD_FullRange; // RGB(SD) to RGB(HD or SD)
+ 219   2        }
+ 220   1      #endif  /* SOURCE_CSC_STD_RANGE */
+ 221   1      
+ 222   1        memcpy(&stCSC, (PBYTE)pCSC, sizeof(MDIN_CSCCTRL_INFO));
+ 223   1        for (i=0; i<3; i++) stCSC.in[i] = (SHORT)stCSC.in[i]/4;
+ 224   1        for (i=0; i<3; i++) stCSC.out[i]= (SHORT)stCSC.out[i]/4;
+ 225   1        stCSC.ctrl = (pSRC->stATTB.attb&MDIN_COLORSPACE_YUV)? 0x7f7c : 0x7f3c;
+ 226   1      
+ 227   1        // use user-defined CSC if exist
+ 228   1        if (pSRC->pCSC!=NULL) memcpy(&stCSC, (PBYTE)pSRC->pCSC, sizeof(MDIN_CSCCTRL_INFO));
+ 229   1      
+ 230   1        if (MDINHIF_MultiWrite(MDIN_LOCAL_ID, 0x181, (PBYTE)&stCSC, sizeof(MDIN_CSCCTRL_INFO)-2)) return MDIN_I2C
+             -_ERROR;
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 5   
+
+ 231   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x180, stCSC.ctrl)) return MDIN_I2C_ERROR;
+ 232   1        return MDIN_NO_ERROR;
+ 233   1      }
+ 234          
+ 235          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 236          static MDIN_ERROR_t MDINAUX_SetOutVideoCSC(PMDIN_VIDEO_INFO pINFO)
+ 237          {
+ 238   1        PMDIN_SRCVIDEO_INFO pSRC = (PMDIN_SRCVIDEO_INFO)&pINFO->stSRC_x;
+ 239   1        PMDIN_OUTVIDEO_INFO pOUT = (PMDIN_OUTVIDEO_INFO)&pINFO->stOUT_x;
+ 240   1      
+ 241   1        SHORT i, coef[9]; MDIN_CSCCTRL_INFO stCSC, *pCSC;
+ 242   1        LONG contrast, saturation, brightness, coshue, sinhue;
+ 243   1      
+ 244   1      #if OUTPUT_CSC_STD_RANGE == 1
+                if (pSRC->stATTB.attb&MDIN_QUALITY_HD) {
+                  if (pOUT->stATTB.attb&MDIN_COLORSPACE_YUV) {
+                    if (pOUT->stATTB.attb&MDIN_QUALITY_HD)
+                       pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscBypass_StdRange; // RGB or YUV(HD) to YUV(HD)
+                    else pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscHDtoSD_StdRange; // RGB or YUV(HD) to YUV(SD)
+                  }
+                  else {
+                    if (pOUT->stATTB.attb&MDIN_QUALITY_HD)
+                       pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscYUVtoRGB_HD_StdRange;  // RGB or YUV(HD) to RGB(HD)
+                    else pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscYUVtoRGB_HD_StdRange;  // RGB or YUV(HD) to RGB(SD)
+                  }
+                }
+                else {
+                  if (pOUT->stATTB.attb&MDIN_COLORSPACE_YUV) {
+                    if (pOUT->stATTB.attb&MDIN_QUALITY_HD)
+                       pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscSDtoHD_StdRange; // RGB or YUV(SD) to YUV(HD)
+                    else pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscBypass_StdRange; // RGB or YUV(SD) to YUV(SD)
+                  }
+                  else {
+                    if (pOUT->stATTB.attb&MDIN_QUALITY_HD)
+                       pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscYUVtoRGB_SD_StdRange;  // RGB or YUV(SD) to RGB(HD)
+                    else pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscYUVtoRGB_SD_StdRange;  // RGB or YUV(SD) to RGB(SD)
+                  }
+                }
+              #else /* OUTPUT_CSC_STD_RANGE == 0 */
+ 270   1        if (pSRC->stATTB.attb&MDIN_QUALITY_HD) {
+ 271   2          if (pOUT->stATTB.attb&MDIN_COLORSPACE_YUV) {
+ 272   3            if (pOUT->stATTB.attb&MDIN_QUALITY_HD)
+ 273   3               pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscBypass_StdRange; // RGB or YUV(HD) to YUV(HD)
+ 274   3            else pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscHDtoSD_StdRange; // RGB or YUV(HD) to YUV(SD)
+ 275   3          }
+ 276   2          else {
+ 277   3            if (pOUT->stATTB.attb&MDIN_QUALITY_HD)
+ 278   3               pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscYUVtoRGB_HD_FullRange; // RGB or YUV(HD) to RGB(HD)
+ 279   3            else pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscYUVtoRGB_HD_FullRange; // RGB or YUV(HD) to RGB(SD)
+ 280   3          }
+ 281   2        }
+ 282   1        else {
+ 283   2          if (pOUT->stATTB.attb&MDIN_COLORSPACE_YUV) {
+ 284   3            if (pOUT->stATTB.attb&MDIN_QUALITY_HD)
+ 285   3               pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscSDtoHD_StdRange; // RGB or YUV(SD) to YUV(HD)
+ 286   3            else pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscBypass_StdRange; // RGB or YUV(SD) to YUV(SD)
+ 287   3          }
+ 288   2          else {
+ 289   3            if (pOUT->stATTB.attb&MDIN_QUALITY_HD)
+ 290   3               pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscYUVtoRGB_SD_FullRange; // RGB or YUV(SD) to RGB(HD)
+ 291   3            else pCSC = (PMDIN_CSCCTRL_INFO)&MDIN_CscYUVtoRGB_SD_FullRange; // RGB or YUV(SD) to RGB(SD)
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 6   
+
+ 292   3          }
+ 293   2        }
+ 294   1      #endif  /* OUTPUT_CSC_STD_RANGE */
+ 295   1      
+ 296   1        memcpy(&stCSC, (PBYTE)pCSC, sizeof(MDIN_CSCCTRL_INFO));
+ 297   1        for (i=0; i<3; i++) stCSC.in[i] = (SHORT)stCSC.in[i]/4;
+ 298   1        for (i=0; i<3; i++) stCSC.out[i]= (SHORT)stCSC.out[i]/4;
+ 299   1        stCSC.ctrl = 0x7f7c;
+ 300   1      
+ 301   1        // use user-defined CSC if exist
+ 302   1        if (pOUT->pCSC!=NULL) memcpy(&stCSC, (PBYTE)pOUT->pCSC, sizeof(MDIN_CSCCTRL_INFO));
+ 303   1      
+ 304   1        saturation = (LONG)(WORD)pOUT->saturation;
+ 305   1        contrast = (LONG)(WORD)pOUT->contrast;
+ 306   1        brightness = (LONG)(WORD)pOUT->brightness;
+ 307   1        coshue = (LONG)(SHORT)MDIN_CscCosHue[pOUT->hue];
+ 308   1        sinhue = (LONG)(SHORT)MDIN_CscSinHue[pOUT->hue];
+ 309   1        for (i=0; i<9; i++) coef[i] = (SHORT)stCSC.coef[i];
+ 310   1      
+ 311   1        stCSC.coef[0] = CLIP12((((coef[0]*contrast)>>7)))&0xfff;
+ 312   1        stCSC.coef[1] = CLIP12((((coef[1]*coshue+coef[2]*sinhue)*saturation)>>17))&0xfff;
+ 313   1        stCSC.coef[2] = CLIP12((((coef[2]*coshue-coef[1]*sinhue)*saturation)>>17))&0xfff;
+ 314   1        stCSC.coef[3] = CLIP12((((coef[3]*contrast)>>7)))&0xfff;
+ 315   1        stCSC.coef[4] = CLIP12((((coef[4]*coshue+coef[5]*sinhue)*saturation)>>17))&0xfff;
+ 316   1        stCSC.coef[5] = CLIP12((((coef[5]*coshue-coef[4]*sinhue)*saturation)>>17))&0xfff;
+ 317   1        stCSC.coef[6] = CLIP12((((coef[6]*contrast)>>7)))&0xfff;
+ 318   1        stCSC.coef[7] = CLIP12((((coef[7]*coshue+coef[8]*sinhue)*saturation)>>17))&0xfff;
+ 319   1        stCSC.coef[8] = CLIP12((((coef[8]*coshue-coef[7]*sinhue)*saturation)>>17))&0xfff;
+ 320   1        stCSC.in[0]   = CLIP09((((SHORT)stCSC.in[0])+(brightness-128)))&0x1ff;
+ 321   1      
+ 322   1      #if RGB_GAIN_OFFSET_TUNE == 1
+                if ((pOUT->stATTB.attb&MDIN_COLORSPACE_YUV)==0) { // only apply for RGB output
+                  stCSC.coef[0] = CLIP12((((coef[0]*contrast*(LONG)pOUT->g_gain)>>14)))&0xfff;
+                  stCSC.coef[3] = CLIP12((((coef[0]*contrast*(LONG)pOUT->b_gain)>>14)))&0xfff;
+                  stCSC.coef[6] = CLIP12((((coef[0]*contrast*(LONG)pOUT->r_gain)>>14)))&0xfff;
+                  stCSC.out[0]  = CLIP09((((SHORT)pOUT->g_offset)-128)+stCSC.out[0])&0xfff;
+                  stCSC.out[1]  = CLIP09((((SHORT)pOUT->b_offset)-128)+stCSC.out[1])&0xfff;
+                  stCSC.out[2]  = CLIP09((((SHORT)pOUT->r_offset)-128)+stCSC.out[2])&0xfff;
+                }
+              #endif
+ 332   1      
+ 333   1        if (MDINHIF_MultiWrite(MDIN_LOCAL_ID, 0x191, (PBYTE)&stCSC, sizeof(MDIN_CSCCTRL_INFO)-2)) return MDIN_I2C
+             -_ERROR;
+ 334   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x190, stCSC.ctrl)) return MDIN_I2C_ERROR;
+ 335   1        return MDIN_NO_ERROR;
+ 336   1      }
+ 337          
+ 338          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 339          static MDIN_ERROR_t MDINAUX_SetOutVideoSYNC(PMDIN_VIDEO_INFO pINFO)
+ 340          {
+ 341   1        MDIN_OUTVIDEO_SYNC  stSYNC, *pSYNC;   WORD mode;
+ 342   1        PMDIN_OUTVIDEO_INFO pOUT = (PMDIN_OUTVIDEO_INFO)&pINFO->stOUT_x;
+ 343   1      
+ 344   1        pSYNC = (PMDIN_OUTVIDEO_SYNC)&defMDINOutSync[pOUT->frmt];
+ 345   1        if (pOUT->pSYNC!=NULL) pSYNC = pOUT->pSYNC; // use user-defined SYNC if exist
+ 346   1      
+ 347   1        memcpy(&stSYNC, (PBYTE)pSYNC, sizeof(MDIN_OUTVIDEO_SYNC));
+ 348   1        stSYNC.posFLD |= (pOUT->stATTB.attb&MDIN_SCANTYPE_PROG)? 0 : (1<<15); // interlace out
+ 349   1      
+ 350   1        // restore Hsync delay
+ 351   1        if (pINFO->dacPATH!=DAC_PATH_MAIN_PIP) {stSYNC.bgnHA += 40; stSYNC.endHA += 40;}    
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 7   
+
+ 352   1      
+ 353   1        // MUX656 format
+ 354   1        if (pOUT->mode==MDIN_OUT_MUX656_8||pOUT->mode==MDIN_OUT_MUX656_10) {
+ 355   2          stSYNC.totHS = stSYNC.totHS*2;
+ 356   2          stSYNC.bgnHA = stSYNC.bgnHA*2;  stSYNC.endHA = stSYNC.endHA*2;
+ 357   2          stSYNC.bgnHS = stSYNC.bgnHS*2;  stSYNC.endHS = stSYNC.endHS*2;
+ 358   2        }
+ 359   1      
+ 360   1        if (MDINHIF_MultiWrite(MDIN_LOCAL_ID, 0x16e, (PBYTE)&stSYNC, 36)) return MDIN_I2C_ERROR;
+ 361   1      
+ 362   1        // aux_etc_ctrl2 - aux_free_run
+ 363   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x142, 2, 1, MBIT(pOUT->fine,MDIN_SYNC_FREERUN))) return MDIN_I2C_ERR
+             -OR;
+ 364   1      
+ 365   1        // aux_frame_ptr_ctrl - aux_rpt_chk_offset
+ 366   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x144, 0, 4, 10)) return MDIN_I2C_ERROR;  // fix 10
+ 367   1      
+ 368   1        // aux_ptr_ctrl - aux_sg_mch_en, aux_dig_mch_en ==> for 4-CH input mode, 2-HD input mode
+ 369   1        if    (pINFO->dacPATH==DAC_PATH_AUX_4CH)  mode = 2;
+ 370   1        else if (pINFO->dacPATH==DAC_PATH_AUX_2HD)  mode = 2;
+ 371   1        else                    mode = 0;
+ 372   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x147, 14, 2, mode)) return MDIN_I2C_ERROR;
+ 373   1      
+ 374   1        // aux_cid_sel - aux_mwin_v, aux_mwin_h ==> for 4-CH input mode, 2-HD input mode
+ 375   1        if    (pINFO->dacPATH==DAC_PATH_AUX_4CH)  mode = (1<<2)|1;
+ 376   1        else if (pINFO->dacPATH==DAC_PATH_AUX_2HD)  mode = (0<<2)|1;
+ 377   1        else                    mode = (0<<2)|0;
+ 378   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x14a, 12, 4, mode)) return MDIN_I2C_ERROR;
+ 379   1      
+ 380   1        // fcmc_arb_ctrl_2 - auxxr_pri ==> for 4-CH input mode
+ 381   1        mode = (pINFO->dacPATH==DAC_PATH_AUX_4CH)? 15 : 6;
+ 382   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x1d6,  8, 4, mode)) return MDIN_I2C_ERROR;
+ 383   1      
+ 384   1        // fcmc_arb_ctrl_3 - auxxr_starv ==> for 4-CH input mode
+ 385   1        mode = (pINFO->dacPATH==DAC_PATH_AUX_4CH)? 1 : 7;
+ 386   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x1d7,  0, 4, mode)) return MDIN_I2C_ERROR;
+ 387   1      
+ 388   1        // bg_color_y, cbcr
+ 389   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x14c, 0, 8, 0)) return MDIN_I2C_ERROR;   // fix black
+ 390   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x14d, 0x8080)) return MDIN_I2C_ERROR;
+ 391   1      
+ 392   1        // set aux video clock
+ 393   1        if (MDINAUX_SetVideoPLL(stSYNC.xclkS, stSYNC.xclkF, stSYNC.xclkT)) return MDIN_I2C_ERROR;
+ 394   1      //  if (MDINAUX_SetVideoPLL(6, 1, 4)) return MDIN_I2C_ERROR;  // fix 65MHz for test purpose
+ 395   1      
+ 396   1        // aux_cid_sel - aux_channel_sel ==> for 4-CH input mode, 2-HD input mode
+ 397   1        if    (pINFO->dacPATH==DAC_PATH_AUX_4CH)  mode = 0xe4;
+ 398   1        else if (pINFO->dacPATH==DAC_PATH_AUX_2HD)  mode = 0x08;
+ 399   1        else                    mode = 0xe4;
+ 400   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x14a, 0, 8, 8)) return MDIN_I2C_ERROR;   // fix channel
+ 401   1        return MDIN_NO_ERROR;
+ 402   1      }
+ 403          
+ 404          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 405          static BOOL MDINAUX_IsCROP(PMDIN_VIDEO_INFO pINFO)
+ 406          {
+ 407   1        return (pINFO->stCROP_x.w==0||pINFO->stCROP_x.h==0)? FALSE : TRUE;
+ 408   1      }
+ 409          
+ 410          //--------------------------------------------------------------------------------------------------------
+             -------------------
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 8   
+
+ 411          static BOOL MDINAUX_IsZOOM(PMDIN_VIDEO_INFO pINFO)
+ 412          {
+ 413   1        return (pINFO->stZOOM_x.w==0||pINFO->stZOOM_x.h==0)? FALSE : TRUE;
+ 414   1      }
+ 415          
+ 416          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 417          static BOOL MDINAUX_IsVIEW(PMDIN_VIDEO_INFO pINFO)
+ 418          {
+ 419   1        return (pINFO->stVIEW_x.w==0||pINFO->stVIEW_x.h==0)? FALSE : TRUE;
+ 420   1      }
+ 421          
+ 422          #if defined(SYSTEM_USE_MDIN325A)||defined(SYSTEM_USE_MDIN380)
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static void MDINAUX_Get4CHScale(PMDIN_VIDEO_INFO pINFO)
+              {
+                PMDIN_4CHVIDEO_INFO p4CH = (PMDIN_4CHVIDEO_INFO)&pINFO->st4CH_x;
+                PMDIN_MFCSCALE_INFO pMFC = (PMDIN_MFCSCALE_INFO)&pINFO->stMFC_x;
+              
+                switch (p4CH->view) {
+                  case MDIN_4CHVIEW_CH01: case MDIN_4CHVIEW_CH02: 
+                  case MDIN_4CHVIEW_CH03: case MDIN_4CHVIEW_CH04:
+                       pMFC->st4CH.w = pMFC->stDST.w/1; pMFC->st4CH.h = pMFC->stDST.h/1; break;
+              
+                  case MDIN_4CHVIEW_CH12: case MDIN_4CHVIEW_CH13: 
+                  case MDIN_4CHVIEW_CH14: case MDIN_4CHVIEW_CH23: 
+                  case MDIN_4CHVIEW_CH24: case MDIN_4CHVIEW_CH34:
+                       pMFC->st4CH.w = pMFC->stDST.w/2; pMFC->st4CH.h = pMFC->stDST.h/1; break;
+                  default: pMFC->st4CH.w = pMFC->stDST.w/2; pMFC->st4CH.h = pMFC->stDST.h/2; break;
+                }
+              }
+              #endif  /* defined(SYSTEM_USE_MDIN325A)||defined(SYSTEM_USE_MDIN380) */
+ 442          
+ 443          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 444          static MDIN_ERROR_t MDINAUX_SetMFCScaleWind(PMDIN_VIDEO_INFO pINFO)
+ 445          {
+ 446   1        PMDIN_SRCVIDEO_INFO pSRC = (PMDIN_SRCVIDEO_INFO)&pINFO->stSRC_x;
+ 447   1        PMDIN_OUTVIDEO_INFO pOUT = (PMDIN_OUTVIDEO_INFO)&pINFO->stOUT_x;
+ 448   1        PMDIN_MFCSCALE_INFO pMFC = (PMDIN_MFCSCALE_INFO)&pINFO->stMFC_x;
+ 449   1      
+ 450   1        memset(&pINFO->stMFC_x, 0, sizeof(MDIN_MFCSCALE_INFO)); // clear
+ 451   1      
+ 452   1        // config clip_window
+ 453   1        pMFC->stCUT.w  = pSRC->stATTB.Hact; pMFC->stCUT.h  = pSRC->stATTB.Vact;
+ 454   1        if (MDINAUX_IsCROP(pINFO)) memcpy(&pMFC->stCUT, &pINFO->stCROP_x, 8);
+ 455   1      //  pMFC->stCUT.x += pSRC->offH;    pMFC->stCUT.y += pSRC->offV;
+ 456   1      
+ 457   1        // for 2-HD input mode
+ 458   1        if (pINFO->dacPATH==DAC_PATH_AUX_2HD) pMFC->stCUT.w /= 2;
+ 459   1      
+ 460   1        // config win_size_h/v, win_posi_h/v - stDST
+ 461   1        pMFC->stDST.w  = pOUT->stATTB.Hact; pMFC->stDST.h  = pOUT->stATTB.Vact;
+ 462   1        if (MDINAUX_IsVIEW(pINFO)) memcpy(&pMFC->stDST, &pINFO->stVIEW_x, 8);
+ 463   1      
+ 464   1        // for 2-HD input mode
+ 465   1        if (pINFO->dacPATH==DAC_PATH_AUX_2HD) pMFC->stDST.h /= 2;
+ 466   1      
+ 467   1        // config mem_size_h/v (src_size_h2/v2, dst_size_h2/v2) - stFFC
+ 468   1        pMFC->stFFC.sw = pMFC->stCUT.w;   pMFC->stFFC.sh = pMFC->stCUT.h;
+ 469   1        pMFC->stFFC.dw = pMFC->stCUT.w;   pMFC->stFFC.dh = pMFC->stCUT.h;
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 9   
+
+ 470   1      
+ 471   1        if ((pSRC->stATTB.attb&MDIN_SCANTYPE_PROG)==0) pMFC->stFFC.sh /= 2;
+ 472   1        if (pMFC->stFFC.sw>pMFC->stDST.w) pMFC->stFFC.dw = pMFC->stDST.w; // H-down
+ 473   1      //  if (pMFC->stFFC.sh>pMFC->stDST.h) pMFC->stFFC.dh = pMFC->stDST.h; // V-down
+ 474   1        // modified on 29Mar2012
+ 475   1          if (pOUT->stATTB.attb&MDIN_SCANTYPE_PROG) { // when aux output is progressive scan
+ 476   2          if (pMFC->stFFC.sh>pMFC->stDST.h) pMFC->stFFC.dh = pMFC->stDST.h; // V-down
+ 477   2          }
+ 478   1        else {                    // when aux output is interlace scan
+ 479   2          if (pMFC->stFFC.sh>(pMFC->stDST.h/2)) pMFC->stFFC.dh = pMFC->stDST.h; // V-down 
+ 480   2        }
+ 481   1      
+ 482   1      #if defined(SYSTEM_USE_MDIN325A)||defined(SYSTEM_USE_MDIN380)
+                if (pINFO->dacPATH==DAC_PATH_AUX_4CH) MDINAUX_Get4CHScale(pINFO);
+                if (pINFO->dacPATH==DAC_PATH_AUX_4CH&&pMFC->stFFC.sw>pMFC->stDST.w/2)
+                  pMFC->stFFC.dw = pMFC->stDST.w/2; // H-down for 4-CH input mode
+                if (pINFO->dacPATH==DAC_PATH_AUX_4CH&&pMFC->stFFC.sh>pMFC->st4CH.h)
+                  pMFC->stFFC.dh = pMFC->st4CH.h;   // V-down for 4-CH input mode
+              #endif
+ 489   1      
+ 490   1        // config mem_size_h, mem_size_v
+ 491   1        pMFC->stMEM.w  = pMFC->stFFC.dw;  pMFC->stMEM.h  = pMFC->stFFC.dh;
+ 492   1      
+ 493   1        // config src_size_h/v, src_posi_h/v - stSRC
+ 494   1        pMFC->stSRC.w  = pMFC->stFFC.dw;  pMFC->stSRC.h  = pMFC->stFFC.dh;
+ 495   1        if (MDINAUX_IsZOOM(pINFO)) memcpy(&pMFC->stSRC, &pINFO->stZOOM_x, 8);
+ 496   1      
+ 497   1        // config dst_size_h/v - stCRS
+ 498   1        pMFC->stCRS.dw = pMFC->stDST.w;   pMFC->stCRS.dh = pMFC->stDST.h;
+ 499   1      
+ 500   1        // for 4-CH input mode
+ 501   1        if (pINFO->dacPATH==DAC_PATH_AUX_4CH) pMFC->stCRS.dw = pMFC->st4CH.w;
+ 502   1        if (pINFO->dacPATH==DAC_PATH_AUX_4CH) pMFC->stCRS.dh = pMFC->st4CH.h;
+ 503   1      
+ 504   1        // for 2-HD input mode
+ 505   1        if (pINFO->dacPATH==DAC_PATH_AUX_2HD) pMFC->stCRS.dw /= 2;
+ 506   1      
+ 507   1      #if __MDIN3xx_DBGPRT__ == 1
+                Printf("[AUX] sCUT.w=%d, sCUT.h=%d\n\r", pMFC->stCUT.w, pMFC->stCUT.h);
+                Printf("[AUX] CROP.w=%d, CROP.h=%d\n\r", pINFO->stCROP_x.w, pINFO->stCROP_x.h);
+                Printf("[AUX] sDST.w=%d, sDST.h=%d\n\r", pMFC->stDST.w, pMFC->stDST.h);
+                Printf("[AUX] VIEW.w=%d, VIEW.h=%d\n\r", pINFO->stVIEW_x.w, pINFO->stVIEW_x.h);
+                Printf("[AUX] sMEM.w=%d, sMEM.h=%d\n\r", pMFC->stMEM.w, pMFC->stMEM.h);
+                Printf("[AUX] sSRC.w=%d, sSRC.h=%d\n\r", pMFC->stSRC.w, pMFC->stSRC.h);
+                Printf("[AUX] ZOOM.w=%d, ZOOM.h=%d\n\r", pINFO->stZOOM_x.w, pINFO->stZOOM_x.h);
+              #endif
+ 516   1      
+ 517   1        // aux_src_offset
+ 518   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x160, pMFC->stCUT.x)) return MDIN_I2C_ERROR;
+ 519   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x161, pMFC->stCUT.y)) return MDIN_I2C_ERROR;
+ 520   1      
+ 521   1        // aux_src_size
+ 522   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x162, pMFC->stCUT.w)) return MDIN_I2C_ERROR;
+ 523   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x163, pMFC->stCUT.h)) return MDIN_I2C_ERROR;
+ 524   1      
+ 525   1        // aux_mem_size, aux_src_posi
+ 526   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x164, pMFC->stSRC.x)) return MDIN_I2C_ERROR;
+ 527   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x165, pMFC->stSRC.y)) return MDIN_I2C_ERROR;
+ 528   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x166, pMFC->stSRC.w)) return MDIN_I2C_ERROR;
+ 529   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x167, pMFC->stSRC.h)) return MDIN_I2C_ERROR;
+ 530   1      
+ 531   1        // aux_dst_size_h/v
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 10  
+
+ 532   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x168, pMFC->stCRS.dw)) return MDIN_I2C_ERROR;
+ 533   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x169, pMFC->stCRS.dh)) return MDIN_I2C_ERROR;
+ 534   1      
+ 535   1        // aux_win_size, aux_win_posi
+ 536   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x16a, pMFC->stDST.x)) return MDIN_I2C_ERROR;
+ 537   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x16b, pMFC->stDST.y)) return MDIN_I2C_ERROR;
+ 538   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x16c, pMFC->stDST.w)) return MDIN_I2C_ERROR;
+ 539   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x16d, pMFC->stDST.h)) return MDIN_I2C_ERROR;
+ 540   1      
+ 541   1        // if src is interlace, stCUT.h/2. if dst is interlace, stDST.h/2
+ 542   1        if ((pSRC->stATTB.attb&MDIN_SCANTYPE_PROG)==0) pMFC->stCUT.h /= 2;
+ 543   1      //  if ((pSRC->stATTB.attb&MDIN_SCANTYPE_PROG)==0) pMFC->stMEM.h /= 2;
+ 544   1        if ((pOUT->stATTB.attb&MDIN_SCANTYPE_PROG)==0) pMFC->stDST.h /= 2;
+ 545   1      /*
+ 546   1        // if src is interlace && V up-scaler or dst is interlace, stMEM.h/2
+ 547   1        if ((pSRC->stATTB.attb&MDIN_SCANTYPE_PROG)==0&&(pMFC->stCUT.h<=pMFC->stDST.h)||
+ 548   1          (pOUT->stATTB.attb&MDIN_SCANTYPE_PROG)==0) pMFC->stMEM.h /= 2;
+ 549   1      */
+ 550   1        // if V up-scaler && src is interlace, stMEM.h/2
+ 551   1        if ((pMFC->stCUT.h<=pMFC->stDST.h)&&
+ 552   1          (pSRC->stATTB.attb&MDIN_SCANTYPE_PROG)==0) pMFC->stMEM.h /= 2;
+ 553   1      
+ 554   1        // for 4-CH input mode
+ 555   1        if (pINFO->dacPATH==DAC_PATH_AUX_4CH) pMFC->stDST.w = pMFC->st4CH.w;
+ 556   1        if (pINFO->dacPATH==DAC_PATH_AUX_4CH) pMFC->stDST.h = pMFC->st4CH.h;
+ 557   1      
+ 558   1        // MUX656 format - aux_dst_size_h, aux_win_size_h
+ 559   1        if (pOUT->mode!=MDIN_OUT_MUX656_8&&pOUT->mode!=MDIN_OUT_MUX656_10) return MDIN_NO_ERROR;
+ 560   1      
+ 561   1        pMFC->stCRS.dw *= 2;  pMFC->stDST.w *= 2;
+ 562   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x168, pMFC->stCRS.dw)) return MDIN_I2C_ERROR;
+ 563   1        if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x16c, pMFC->stDST.w )) return MDIN_I2C_ERROR;
+ 564   1        return MDIN_NO_ERROR;
+ 565   1      }
+ 566          
+ 567          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 568          static MDIN_ERROR_t MDINAUX_SetMFCScaleCtrl(PMDIN_VIDEO_INFO pINFO)
+ 569          {
+ 570   1        PMDIN_SRCVIDEO_INFO pSRC = (PMDIN_SRCVIDEO_INFO)&pINFO->stSRC_x;
+ 571   1        PMDIN_OUTVIDEO_INFO pOUT = (PMDIN_OUTVIDEO_INFO)&pINFO->stOUT_x;
+ 572   1        PMDIN_MFCSCALE_INFO pMFC = (PMDIN_MFCSCALE_INFO)&pINFO->stMFC_x;
+ 573   1        WORD mode = (1<<6)|(1<<5)|(1<<4)|(1<<3);  // H/V scaler bypass
+ 574   1      
+ 575   1        if (pMFC->stCUT.h<=pMFC->stDST.h) mode |= (6<<9); // V up-scaler
+ 576   1        if (pMFC->stCUT.h >pMFC->stDST.h) mode |= (5<<9); // V dn-scaler
+ 577   1      //  if (pMFC->stCUT.h==pMFC->stDST.h) mode |= (1<<9); // V bypass
+ 578   1      
+ 579   1        if (pMFC->stCUT.h <pMFC->stDST.h) mode &= ~(1<<5);  // V up-scaler
+ 580   1        if (pMFC->stCUT.h >pMFC->stDST.h) mode &= ~(5<<3);  // V dn-scaler
+ 581   1      
+ 582   1        if (pMFC->stMEM.w <pMFC->stDST.w) mode &= ~(1<<6);  // H up-scaler
+ 583   1        if (pMFC->stCUT.w >pMFC->stMEM.w) mode &= ~(1<<4);  // H dn-scaler
+ 584   1      
+ 585   1        // for 4-CH input mode
+ 586   1      //  if (pINFO->dacPATH==DAC_PATH_AUX_4CH) mode &= ~(1<<6);  // H up-scaler
+ 587   1      
+ 588   1        // aux_etc_ctrl - H/V scaling
+ 589   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x142, 3, 9, (mode>>3))) return MDIN_I2C_ERROR;
+ 590   1      
+ 591   1        // aux_etc_ctrl - aux_rd_ext_buf
+ 592   1        mode = (pINFO->dacPATH==DAC_PATH_AUX_4CH)? 0 : 1;
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 11  
+
+ 593   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x141, 1, 1, mode)) return MDIN_I2C_ERROR;
+ 594   1      //  if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x141, 1, 1, 1)) return MDIN_I2C_ERROR; // fix ext-buff
+ 595   1      
+ 596   1        // if src is progressive && out is interlace && V dn-scaler then aux_rd_frm2fld = 1
+ 597   1      //  if ((pSRC->stATTB.attb&MDIN_SCANTYPE_PROG)&&(pMFC->stCUT.h>pMFC->stDST.h)&&
+ 598   1        if ((pSRC->stATTB.attb&MDIN_SCANTYPE_PROG)&&(pMFC->stCUT.h>(pMFC->stDST.h*2))&&   // modified on 29Mar2012
+ 599   1          (pOUT->stATTB.attb&MDIN_SCANTYPE_PROG)==0)  mode = 1;
+ 600   1        else                      mode = 0;
+ 601   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x142, 13, 1, mode)) return MDIN_I2C_ERROR;
+ 602   1      
+ 603   1        // if src is interlace && out is interlace && V dn-scaler then aux_skip_only_en = 1
+ 604   1        if ((pSRC->stATTB.attb&MDIN_SCANTYPE_PROG)==0&&(pMFC->stCUT.h>pMFC->stDST.h)&&
+ 605   1          (pOUT->stATTB.attb&MDIN_SCANTYPE_PROG)==0)  mode = 1;
+ 606   1        else                      mode = 0;
+ 607   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x144, 5, 1, mode)) return MDIN_I2C_ERROR;
+ 608   1      
+ 609   1        return MDIN_NO_ERROR;
+ 610   1      }
+ 611          
+ 612          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 613          static MDIN_ERROR_t MDINAUX_SetAuxVideoCLK(PMDIN_VIDEO_INFO pINFO)
+ 614          {
+ 615   1        PMDIN_MFCSCALE_INFO pMFC = (PMDIN_MFCSCALE_INFO)&pINFO->stMFC_x;
+ 616   1        WORD aux_in, aux_lm, dac_in;//, pip_on;
+ 617   1      
+ 618   1        switch (pINFO->srcPATH) {
+ 619   2          case PATH_MAIN_B_AUX_A:
+ 620   2          case PATH_MAIN_A_AUX_A: aux_in = (0<<8)|0; break;
+ 621   2          case PATH_MAIN_A_AUX_B:
+ 622   2          case PATH_MAIN_B_AUX_B: aux_in = (0<<8)|1; break;
+ 623   2          default:        aux_in = (1<<8)|0; break;
+ 624   2        }
+ 625   1      
+ 626   1        // clk_aux_ctrl - clk_aux_in_sel
+ 627   1        if (MDINHIF_RegField(MDIN_HOST_ID, 0x046, 8, 1, HIBYTE(aux_in))) return MDIN_I2C_ERROR;
+ 628   1      
+ 629   1        // clk_m_ctrl - clk_m_aux_sel
+ 630   1        if (MDINHIF_RegField(MDIN_HOST_ID, 0x047, 0, 1, LOBYTE(aux_in))) return MDIN_I2C_ERROR;
+ 631   1      
+ 632   1        switch (pINFO->dacPATH) {
+ 633   2          case DAC_PATH_MAIN_OUT: dac_in = (0<<8)|0; aux_lm = (1<<8)|1; break;//pip_on = 0; break;
+ 634   2          case DAC_PATH_MAIN_PIP: dac_in = (0<<8)|0; aux_lm = (0<<8)|2; break;//pip_on = 1; break;
+ 635   2          case DAC_PATH_AUX_OUT:  dac_in = (2<<8)|2; aux_lm = (2<<8)|3; break;//pip_on = 0; break;
+ 636   2          case DAC_PATH_VENC_YC:  dac_in = (1<<8)|1; aux_lm = (1<<8)|1; break;//pip_on = 0; break;
+ 637   2          case DAC_PATH_AUX_4CH:  dac_in = (2<<8)|0; aux_lm = (0<<8)|2; break;//pip_on = 0; break;
+ 638   2          case DAC_PATH_AUX_2HD:  dac_in = (2<<8)|0; aux_lm = (0<<8)|2; break;//pip_on = 0; break;
+ 639   2          default:        dac_in = (0<<8)|0; aux_lm = (1<<8)|0; break;//pip_on = 0; break;
+ 640   2        }
+ 641   1      
+ 642   1        // if V dn-scaler then follow aux_in, others follow aux_out
+ 643   1        if (pMFC->stCUT.h>pMFC->stDST.h) {    // V dn-scaler
+ 644   2          aux_lm &= ~(0xff);  aux_lm |= ((HIBYTE(aux_in)==1)? 2 : 0);
+ 645   2        }
+ 646   1      
+ 647   1        // dac_src_sel - dac_data_sel
+ 648   1        if (MDINHIF_RegField(MDIN_HOST_ID, 0x044, 14, 2, HIBYTE(dac_in))) return MDIN_I2C_ERROR;
+ 649   1      
+ 650   1        // dac_clk_sel - dac_clk_sel
+ 651   1        if (MDINHIF_RegField(MDIN_HOST_ID, 0x045, 14, 2, LOBYTE(dac_in))) return MDIN_I2C_ERROR;
+ 652   1      
+ 653   1        // clk_aux_ctrl - clk_aux_out_sel
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 12  
+
+ 654   1        if (MDINHIF_RegField(MDIN_HOST_ID, 0x046,  3, 2, HIBYTE(aux_lm))) return MDIN_I2C_ERROR;
+ 655   1      
+ 656   1        // clk_m_ctrl - clk_aux_lm_sel
+ 657   1        if (MDINHIF_RegField(MDIN_HOST_ID, 0x047, 14, 2, LOBYTE(aux_lm))) return MDIN_I2C_ERROR;
+ 658   1      
+ 659   1        // aux_frame_ptr_ctrl - aux_sync_pip_en
+ 660   1      //  if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x144, 6, 1, LOBYTE(pip_on))) return MDIN_I2C_ERROR;
+ 661   1        return MDIN_NO_ERROR;
+ 662   1      }
+ 663          
+ 664          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 665          static MDIN_ERROR_t MDINAUX_SetFFCNRProcess(PMDIN_VIDEO_INFO pINFO) // added on 16Aug2012
+ 666          {
+ 667   1        BYTE ratio=0; PMDIN_AUXFILT_COEF pCoef;
+ 668   1      
+ 669   1        if (pINFO->srcPATH==PATH_MAIN_A_AUX_M || pINFO->srcPATH==PATH_MAIN_B_AUX_M) {
+ 670   2          ratio=(BYTE)((FLOAT)pINFO->stOUT_m.stATTB.Hact/(FLOAT)pINFO->stOUT_x.stATTB.Hact*10);
+ 671   2        }
+ 672   1        else if (pINFO->srcPATH==PATH_MAIN_A_AUX_A || pINFO->srcPATH==PATH_MAIN_B_AUX_A) {
+ 673   2          ratio=(BYTE)((FLOAT)pINFO->stSRC_a.stATTB.Hact/(FLOAT)pINFO->stOUT_x.stATTB.Hact*10);
+ 674   2        }
+ 675   1        else if (pINFO->srcPATH==PATH_MAIN_B_AUX_B || pINFO->srcPATH==PATH_MAIN_A_AUX_B) {
+ 676   2          ratio=(BYTE)((FLOAT)pINFO->stSRC_b.stATTB.Hact/(FLOAT)pINFO->stOUT_x.stATTB.Hact*10);
+ 677   2        }
+ 678   1      //  Printf("ratio = %d\n\r", ratio);
+ 679   1        if    (ratio <= 10)       pCoef = (PMDIN_AUXFILT_COEF)NULL; //return (PMDIN_AUXFILT_COEF)NULL; // NULL
+ 680   1        else if (ratio >= 11 && ratio < 14) pCoef = (PMDIN_AUXFILT_COEF)&MDIN_AuxFilterCoef[4]; // 0
+ 681   1        else if (ratio >= 15 && ratio < 18) pCoef = (PMDIN_AUXFILT_COEF)&MDIN_AuxFilterCoef[4]; // 0
+ 682   1        else if (ratio >= 18 && ratio < 24) pCoef = (PMDIN_AUXFILT_COEF)&MDIN_AuxFilterCoef[4]; // 1
+ 683   1        else if (ratio >= 24 && ratio < 26) pCoef = (PMDIN_AUXFILT_COEF)&MDIN_AuxFilterCoef[4]; // 2
+ 684   1        else                pCoef = (PMDIN_AUXFILT_COEF)&MDIN_AuxFilterCoef[4]; // 4
+ 685   1      
+ 686   1        if (MDINAUX_SetFrontNRFilterCoef(pCoef)) return MDIN_I2C_ERROR;
+ 687   1        return MDINAUX_EnableFrontNRFilter(pINFO, (pCoef==NULL)? OFF : ON);
+ 688   1      }
+ 689          
+ 690          #if defined(SYSTEM_USE_MDIN325)||defined(SYSTEM_USE_MDIN325A)||defined(SYSTEM_USE_MDIN380)
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINAUX_SetEncFrmtByAUX(PMDIN_VIDEO_INFO pINFO)
+              {
+                if (pINFO->encPATH!=VENC_PATH_PORT_X) return MDIN_NO_ERROR;
+              
+                switch (pINFO->stOUT_x.frmt) {
+                  case VIDOUT_720x576i50: pINFO->encFRMT = VID_VENC_PAL_B;  break;
+                  default:        pINFO->encFRMT = VID_VENC_NTSC_M; break;
+                }
+                return MDIN_NO_ERROR;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static MDIN_ERROR_t MDINAUX_SetEncVideoFrmt(PMDIN_VIDEO_INFO pINFO)
+              {
+                BYTE mode, eclk, nID, *pBuff;
+              
+                if (MDINAUX_SetEncFrmtByAUX(pINFO)) return MDIN_I2C_ERROR;
+              
+                switch (pINFO->encFRMT) {
+                  case VID_VENC_NTSC_M: mode = (0<<4)|0; nID = 0; break;
+                  case VID_VENC_NTSC_J: mode = (1<<4)|0; nID = 0; break;
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 13  
+
+                  case VID_VENC_NTSC_443: mode = (0<<4)|1; nID = 0; break;
+                  case VID_VENC_PAL_B:  mode = (2<<4)|1; nID = 1; break;
+                  case VID_VENC_PAL_D:  mode = (2<<4)|1; nID = 1; break;
+                  case VID_VENC_PAL_G:  mode = (2<<4)|1; nID = 1; break;
+                  case VID_VENC_PAL_H:  mode = (2<<4)|1; nID = 1; break;
+                  case VID_VENC_PAL_I:  mode = (2<<4)|1; nID = 1; break;
+                  case VID_VENC_PAL_M:  mode = (0<<4)|2; nID = 0; break;
+                  case VID_VENC_PAL_N:  mode = (0<<4)|1; nID = 1; break;
+                  case VID_VENC_PAL_Nc: mode = (2<<4)|3; nID = 1; break;
+                  default:        mode = (0<<4)|0; nID = 0; break;
+                }
+              
+                pBuff = (PBYTE)&MDIN_Encoder_Default[nID];
+                if (MDINHIF_MultiWrite(MDIN_LOCAL_ID, 0x1e0, pBuff, 38)) return MDIN_I2C_ERROR;
+              
+                // venc_input_config - venc_csc_sel
+                if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x1e0, 14, 2, HI4BIT(mode))) return MDIN_I2C_ERROR;
+              
+                // venc_output_mux - venc_mod_format
+                if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x1e8,  0, 3, LO4BIT(mode))) return MDIN_I2C_ERROR;
+              
+                switch (pINFO->encPATH) {
+                  case VENC_PATH_PORT_A:  mode = (0<<4)|2; eclk = 2; break;
+                  case VENC_PATH_PORT_B:  mode = (2<<4)|2; eclk = 3; break;
+                  default:        mode = (0<<4)|0; eclk = 1; break;
+                }
+              
+                // clk_aux_ctrl - venc_clk_sel
+                if (MDINHIF_RegField(MDIN_HOST_ID,  0x046, 11, 2, LO4BIT(eclk))) return MDIN_I2C_ERROR;
+              
+                // in_frame_cfg1 - venc_src_sel
+                if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x01e, 12, 2, HI4BIT(mode))) return MDIN_I2C_ERROR;
+              
+                // venc_input_config - venc_input_sel
+                if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x1e0, 12, 2, LO4BIT(mode))) return MDIN_I2C_ERROR;
+                return MDIN_NO_ERROR;
+              }
+              #endif  /* defined(SYSTEM_USE_MDIN325)||defined(SYSTEM_USE_MDIN325A)||defined(SYSTEM_USE_MDIN380) */
+ 751          
+ 752          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 753          // Drive Function for Video Process Block (Input/Output/Scaler/Deinterlace/CSC/PLL)
+ 754          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 755          MDIN_ERROR_t MDINAUX_VideoProcess(PMDIN_VIDEO_INFO pINFO)
+ 756          {
+ 757   1        if (MDINAUX_SetSrcVideoFrmt(pINFO)) return MDIN_I2C_ERROR;    // set source video format
+ 758   1        if (MDINAUX_SetOutVideoFrmt(pINFO)) return MDIN_I2C_ERROR;    // set output video format
+ 759   1      
+ 760   1        if (MDINAUX_SetSrcVideoCSC(pINFO)) return MDIN_I2C_ERROR;   // set source video CSC
+ 761   1        if (MDINAUX_SetOutVideoCSC(pINFO)) return MDIN_I2C_ERROR;   // set output video CSC
+ 762   1      
+ 763   1        if (MDINAUX_SetOutVideoSYNC(pINFO)) return MDIN_I2C_ERROR;    // set output video SYNC
+ 764   1      
+ 765   1        if (MDINAUX_SetMFCScaleWind(pINFO)) return MDIN_I2C_ERROR;    // set MFC scaler window
+ 766   1        if (MDINAUX_SetMFCScaleCtrl(pINFO)) return MDIN_I2C_ERROR;    // set MFC scaler control
+ 767   1      
+ 768   1        if (MDINAUX_SetAuxVideoCLK(pINFO)) return MDIN_I2C_ERROR;   // set aux-video clock
+ 769   1        if (MDINAUX_SetFFCNRProcess(pINFO)) return MDIN_I2C_ERROR;    // set aux anti-aliasing filter on 16Aug2012
+ 770   1        
+ 771   1      #if defined(SYSTEM_USE_MDIN325)||defined(SYSTEM_USE_MDIN325A)||defined(SYSTEM_USE_MDIN380)
+                if (MDINAUX_SetEncVideoFrmt(pINFO)) return MDIN_I2C_ERROR;    // set video-encoder format
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 14  
+
+              #endif
+ 774   1      
+ 775   1        return MDIN_NO_ERROR;
+ 776   1      }
+ 777          
+ 778          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 779          MDIN_ERROR_t MDINAUX_SetScaleProcess(PMDIN_VIDEO_INFO pINFO)
+ 780          {
+ 781   1        if (MDINAUX_SetMFCScaleWind(pINFO)) return MDIN_I2C_ERROR;    // set MFC scaler window
+ 782   1        if (MDINAUX_SetMFCScaleCtrl(pINFO)) return MDIN_I2C_ERROR;    // set MFC scaler control
+ 783   1        if (MDINAUX_SetAuxVideoCLK(pINFO)) return MDIN_I2C_ERROR;   // set aux-video clock
+ 784   1        return MDIN_NO_ERROR;
+ 785   1      }
+ 786          
+ 787          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 788          // Drive Function for Source Video Block
+ 789          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 790          /*
+ 791          MDIN_ERROR_t MDINAUX_SetSrcHighTopFieldID(PMDIN_VIDEO_INFO pINFO, BOOL OnOff)
+ 792          {
+ 793            PMDIN_SRCVIDEO_INFO pSRC = (PMDIN_SRCVIDEO_INFO)&pINFO->stSRC_x;
+ 794          
+ 795            if (OnOff)  pSRC->fine |=  MDIN_HIGH_IS_TOPFLD;
+ 796            else    pSRC->fine &= ~MDIN_HIGH_IS_TOPFLD;
+ 797          
+ 798            if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x140, 5, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+ 799            return MDIN_NO_ERROR;
+ 800          }
+ 801          
+ 802          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 803          MDIN_ERROR_t MDINAUX_SetSrcCbCrSwap(PMDIN_VIDEO_INFO pINFO, BOOL OnOff)
+ 804          {
+ 805            PMDIN_SRCVIDEO_INFO pSRC = (PMDIN_SRCVIDEO_INFO)&pINFO->stSRC_x;
+ 806          
+ 807            if (OnOff)  pSRC->fine |=  MDIN_CbCrSWAP_ON;
+ 808            else    pSRC->fine &= ~MDIN_CbCrSWAP_ON;
+ 809          
+ 810            if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x140, 4, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+ 811            return MDIN_NO_ERROR;
+ 812          }
+ 813          
+ 814          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 815          MDIN_ERROR_t MDINAUX_SetSrcHSPolarity(PMDIN_VIDEO_INFO pINFO, BOOL edge)
+ 816          {
+ 817            PMDIN_SRCVIDEO_INFO pSRC = (PMDIN_SRCVIDEO_INFO)&pINFO->stSRC_x;
+ 818          
+ 819            if (edge) pSRC->stATTB.attb |=  MDIN_NEGATIVE_HACT;
+ 820            else    pSRC->stATTB.attb &= ~MDIN_NEGATIVE_HACT;
+ 821          
+ 822            if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x140, 7, 1, MBIT(edge,1))) return MDIN_I2C_ERROR;
+ 823            return MDIN_NO_ERROR;
+ 824          }
+ 825          
+ 826          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 827          MDIN_ERROR_t MDINAUX_SetSrcVSPolarity(PMDIN_VIDEO_INFO pINFO, BOOL edge)
+ 828          {
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 15  
+
+ 829            PMDIN_SRCVIDEO_INFO pSRC = (PMDIN_SRCVIDEO_INFO)&pINFO->stSRC_x;
+ 830          
+ 831            if (edge) pSRC->stATTB.attb |=  MDIN_NEGATIVE_VACT;
+ 832            else    pSRC->stATTB.attb &= ~MDIN_NEGATIVE_VACT;
+ 833          
+ 834            if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x140, 6, 1, MBIT(edge,1))) return MDIN_I2C_ERROR;
+ 835            return MDIN_NO_ERROR;
+ 836          }
+ 837          
+ 838          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 839          MDIN_ERROR_t MDINAUX_SetSrcOffset(PMDIN_VIDEO_INFO pINFO, WORD offH, WORD offV)
+ 840          {
+ 841            PMDIN_SRCVIDEO_INFO pSRC = (PMDIN_SRCVIDEO_INFO)&pINFO->stSRC_x;
+ 842          
+ 843            pSRC->offH = offH;  pSRC->offV = offV;
+ 844            if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x160, offH)) return MDIN_I2C_ERROR;
+ 845            if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x161, offV)) return MDIN_I2C_ERROR;
+ 846            return MDIN_NO_ERROR;
+ 847          }
+ 848          
+ 849          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 850          MDIN_ERROR_t MDINAUX_SetSrcCSCCoef(PMDIN_VIDEO_INFO pINFO, PMDIN_CSCCTRL_INFO pCSC)
+ 851          {
+ 852            pINFO->stSRC_x.pCSC = pCSC;
+ 853            return MDINAUX_SetSrcVideoCSC(pINFO);
+ 854          }
+ 855          */
+ 856          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 857          // Drive Function for Output Video Block
+ 858          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 859          /*bob
+ 860          MDIN_ERROR_t MDINAUX_SetOutCbCrSwap(PMDIN_VIDEO_INFO pINFO, BOOL OnOff)
+ 861          {
+ 862            PMDIN_OUTVIDEO_INFO pOUT = (PMDIN_OUTVIDEO_INFO)&pINFO->stOUT_x;
+ 863          
+ 864            if (OnOff)  pOUT->fine |=  MDIN_CbCrSWAP_ON;
+ 865            else    pOUT->fine &= ~MDIN_CbCrSWAP_ON;
+ 866          
+ 867            if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x145, 6, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+ 868            return MDIN_NO_ERROR;
+ 869          }
+ 870          
+ 871          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 872          MDIN_ERROR_t MDINAUX_SetOutHSPinMode(PMDIN_VIDEO_INFO pINFO, MDIN_HSOUT_MODE_t mode)
+ 873          {
+ 874            PMDIN_OUTVIDEO_INFO pOUT = (PMDIN_OUTVIDEO_INFO)&pINFO->stOUT_x;
+ 875          
+ 876            pOUT->stATTB.attb &= ~(MDIN_HSYNC_IS_HACT);
+ 877            pOUT->stATTB.attb |= ((WORD)mode<<14);
+ 878          
+ 879            if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x145, 12, 1, MBIT(mode,MDIN_HSOUT_PIN_DE))) return MDIN_I2C_ERROR;
+ 880            return MDIN_NO_ERROR;
+ 881          }
+ 882          
+ 883          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 884          MDIN_ERROR_t MDINAUX_SetOutHSPolarity(PMDIN_VIDEO_INFO pINFO, BOOL edge)
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 16  
+
+ 885          {
+ 886            PMDIN_OUTVIDEO_INFO pOUT = (PMDIN_OUTVIDEO_INFO)&pINFO->stOUT_x;
+ 887          
+ 888            if (edge) pOUT->stATTB.attb |=  MDIN_POSITIVE_HSYNC;
+ 889            else    pOUT->stATTB.attb &= ~MDIN_POSITIVE_HSYNC;
+ 890          
+ 891            if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x145, 14, 1, MBIT(edge,1))) return MDIN_I2C_ERROR;
+ 892            return MDIN_NO_ERROR;
+ 893          }
+ 894          
+ 895          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 896          MDIN_ERROR_t MDINAUX_SetOutVSPolarity(PMDIN_VIDEO_INFO pINFO, BOOL edge)
+ 897          {
+ 898            PMDIN_OUTVIDEO_INFO pOUT = (PMDIN_OUTVIDEO_INFO)&pINFO->stOUT_x;
+ 899          
+ 900            if (edge) pOUT->stATTB.attb |=  MDIN_POSITIVE_VSYNC;
+ 901            else    pOUT->stATTB.attb &= ~MDIN_POSITIVE_VSYNC;
+ 902          
+ 903            if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x145, 13, 1, MBIT(edge,1))) return MDIN_I2C_ERROR;
+ 904            return MDIN_NO_ERROR;
+ 905          }
+ 906          
+ 907          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 908          MDIN_ERROR_t MDINAUX_SetPictureBrightness(PMDIN_VIDEO_INFO pINFO, BYTE value)
+ 909          {
+ 910            pINFO->stOUT_x.brightness = value;
+ 911            return MDINAUX_SetOutVideoCSC(pINFO);
+ 912          }
+ 913          
+ 914          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 915          MDIN_ERROR_t MDINAUX_SetPictureContrast(PMDIN_VIDEO_INFO pINFO, BYTE value)
+ 916          {
+ 917            pINFO->stOUT_x.contrast = value;
+ 918            return MDINAUX_SetOutVideoCSC(pINFO);
+ 919          }
+ 920          
+ 921          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 922          MDIN_ERROR_t MDINAUX_SetPictureSaturation(PMDIN_VIDEO_INFO pINFO, BYTE value)
+ 923          {
+ 924            pINFO->stOUT_x.saturation = value;
+ 925            return MDINAUX_SetOutVideoCSC(pINFO);
+ 926          }
+ 927          
+ 928          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 929          MDIN_ERROR_t MDINAUX_SetPictureHue(PMDIN_VIDEO_INFO pINFO, BYTE value)
+ 930          {
+ 931            pINFO->stOUT_x.hue = value;
+ 932            return MDINAUX_SetOutVideoCSC(pINFO);
+ 933          }
+ 934          */
+ 935          #if RGB_GAIN_OFFSET_TUNE == 1
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              MDIN_ERROR_t MDINAUX_SetPictureGainR(PMDIN_VIDEO_INFO pINFO, BYTE value)
+              {
+                pINFO->stOUT_x.r_gain = value;
+                return MDINAUX_SetOutVideoCSC(pINFO);
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 17  
+
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              MDIN_ERROR_t MDINAUX_SetPictureGainG(PMDIN_VIDEO_INFO pINFO, BYTE value)
+              {
+                pINFO->stOUT_x.g_gain = value;
+                return MDINAUX_SetOutVideoCSC(pINFO);
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              MDIN_ERROR_t MDINAUX_SetPictureGainB(PMDIN_VIDEO_INFO pINFO, BYTE value)
+              {
+                pINFO->stOUT_x.b_gain = value;
+                return MDINAUX_SetOutVideoCSC(pINFO);
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              MDIN_ERROR_t MDINAUX_SetPictureOffsetR(PMDIN_VIDEO_INFO pINFO, BYTE value)
+              {
+                pINFO->stOUT_x.r_offset = value;
+                return MDINAUX_SetOutVideoCSC(pINFO);
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              MDIN_ERROR_t MDINAUX_SetPictureOffsetG(PMDIN_VIDEO_INFO pINFO, BYTE value)
+              {
+                pINFO->stOUT_x.g_offset = value;
+                return MDINAUX_SetOutVideoCSC(pINFO);
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              MDIN_ERROR_t MDINAUX_SetPictureOffsetB(PMDIN_VIDEO_INFO pINFO, BYTE value)
+              {
+                pINFO->stOUT_x.b_offset = value;
+                return MDINAUX_SetOutVideoCSC(pINFO);
+              }
+              #endif
+ 978          
+ 979          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 980          /*bob
+ 981          MDIN_ERROR_t MDINAUX_SetOutCSCCoef(PMDIN_VIDEO_INFO pINFO, PMDIN_CSCCTRL_INFO pCSC)
+ 982          {
+ 983            pINFO->stOUT_x.pCSC = (PMDIN_CSCCTRL_INFO)pCSC;
+ 984            return MDINAUX_SetOutVideoCSC(pINFO);
+ 985          }
+ 986          
+ 987          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 988          MDIN_ERROR_t MDINAUX_SetOutSYNCCtrl(PMDIN_VIDEO_INFO pINFO, PMDIN_OUTVIDEO_SYNC pSYNC)
+ 989          {
+ 990            pINFO->stOUT_x.pSYNC = (PMDIN_OUTVIDEO_SYNC)pSYNC;
+ 991            return MDINAUX_SetOutVideoSYNC(pINFO);
+ 992          }
+ 993          */
+ 994          //--------------------------------------------------------------------------------------------------------
+             -------------------
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 18  
+
+ 995          // Drive Function for Video Window
+ 996          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 997          /*bob
+ 998          MDIN_ERROR_t MDINAUX_GetVideoWindowFRMB(PMDIN_VIDEO_INFO pINFO, PMDIN_VIDEO_WINDOW pFRMB)
+ 999          {
+1000            PMDIN_SRCVIDEO_INFO pSRC = (PMDIN_SRCVIDEO_INFO)&pINFO->stSRC_x;
+1001          
+1002            pFRMB->w = pINFO->stMFC_x.stMEM.w;
+1003            pFRMB->h = pINFO->stMFC_x.stMEM.h;
+1004            pFRMB->x = pFRMB->y = 0;
+1005          
+1006            if ((pSRC->stATTB.attb&MDIN_SCANTYPE_PROG)==0) pFRMB->h *= 2;
+1007            return MDIN_NO_ERROR;
+1008          }
+1009          
+1010          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1011          MDIN_ERROR_t MDINAUX_SetVideoWindowCROP(PMDIN_VIDEO_INFO pINFO, MDIN_VIDEO_WINDOW stCROP)
+1012          {
+1013            memcpy(&pINFO->stCROP_x, &stCROP, sizeof(MDIN_VIDEO_WINDOW));
+1014            return MDIN3xx_SetScaleProcess(pINFO);
+1015          }
+1016          
+1017          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1018          MDIN_ERROR_t MDINAUX_SetVideoWindowZOOM(PMDIN_VIDEO_INFO pINFO, MDIN_VIDEO_WINDOW stZOOM)
+1019          {
+1020            memcpy(&pINFO->stZOOM_x, &stZOOM, sizeof(MDIN_VIDEO_WINDOW));
+1021            return MDINAUX_SetScaleProcess(pINFO);
+1022          }
+1023          
+1024          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1025          MDIN_ERROR_t MDINAUX_SetVideoWindowVIEW(PMDIN_VIDEO_INFO pINFO, MDIN_VIDEO_WINDOW stVIEW)
+1026          {
+1027            memcpy(&pINFO->stVIEW_x, &stVIEW, sizeof(MDIN_VIDEO_WINDOW));
+1028            return MDIN3xx_SetScaleProcess(pINFO);
+1029          }
+1030          */
+1031          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1032          // Drive Function for Filters Block
+1033          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1034          MDIN_ERROR_t MDINAUX_SetFrontNRFilterCoef(PMDIN_AUXFILT_COEF pCoef)
+1035          {
+1036   1        if (pCoef==NULL) pCoef = (PMDIN_AUXFILT_COEF)MDIN_AuxDownFilter_Default;
+1037   1        if (MDINHIF_MultiWrite(MDIN_LOCAL_ID, 0x151, (PBYTE)pCoef, 28)) return MDIN_I2C_ERROR;
+1038   1        return MDIN_NO_ERROR;
+1039   1      }
+1040          
+1041          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1042          
+1043          MDIN_ERROR_t MDINAUX_EnableFrontNRFilter(PMDIN_VIDEO_INFO pINFO, BOOL OnOff)
+1044          {
+1045   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x150, 0, 2, (OnOff)? 3 : 0)) return MDIN_I2C_ERROR;
+1046   1        if (pINFO->stMFC_x.stMEM.w>1024) OnOff = OFF; // if h_size>1024, then v-filter is OFF
+1047   1        if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x150, 2, 3, (OnOff)? 7 : 0)) return MDIN_I2C_ERROR;
+1048   1        return MDIN_NO_ERROR;
+1049   1      }
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 19  
+
+1050          
+1051          /*
+1052          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1053          // Drive Function for Video-Encoder Block
+1054          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1055          MDIN_ERROR_t MDINAUX_EnableVENCColorMode(BOOL OnOff)
+1056          {
+1057            if (MDINHIF_RegWrite(0x4C6, 0x0008)) return MDIN_I2C_ERROR;     // reg_oen
+1058            if (MDINHIF_RegField(0x5D4, 13, 1, (OnOff)? 0 : 1)) return MDIN_I2C_ERROR;
+1059            return (MDINHIF_RegWrite(0x4C4, 1))? MDIN_I2C_ERROR:MDIN_NO_ERROR;  // update local register
+1060          }
+1061          
+1062          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1063          MDIN_ERROR_t MDINAUX_EnableVENCBlueScreen(BOOL OnOff)
+1064          {
+1065            if (MDINHIF_RegWrite(0x4C6, 0x0008)) return MDIN_I2C_ERROR;     // reg_oen
+1066            if (MDINHIF_RegField(0x5D4, 10, 1, (OnOff)? ON : OFF)) return MDIN_I2C_ERROR;
+1067            return (MDINHIF_RegWrite(0x4C4, 1))? MDIN_I2C_ERROR:MDIN_NO_ERROR;  // update local register
+1068          }
+1069          
+1070          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1071          MDIN_ERROR_t MDINAUX_EnableVENCPeakingFilter(BOOL OnOff)
+1072          {
+1073            if (MDINHIF_RegWrite(0x4C6, 0x0008)) return MDIN_I2C_ERROR;     // reg_oen
+1074            if (MDINHIF_RegField(0x5DC, 3, 1, (OnOff)? ON : OFF)) return MDIN_I2C_ERROR;
+1075            return (MDINHIF_RegWrite(0x4C4, 1))? MDIN_I2C_ERROR:MDIN_NO_ERROR;  // update local register
+1076          }
+1077          */
+1078          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1079          // Drive Function for ETC(reset, port out, freeze, etc) Block
+1080          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1081          /*
+1082          MDIN_ERROR_t MDINAUX_EnableMirrorH(PMDIN_VIDEO_INFO pINFO, BOOL OnOff)
+1083          {
+1084            PMDIN_MFCSCALE_INFO pMFC = (PMDIN_MFCSCALE_INFO)&pINFO->stMFC_x;
+1085          
+1086            if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x148, 0, 11, (OnOff)? pMFC->stFFC.dw-256 : 0)) return MDIN_I2C_ERROR
+             -;
+1087            if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x148, 15, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+1088            return MDIN_NO_ERROR;
+1089          }
+1090          
+1091          //--------------------------------------------------------------------------------------------------------
+             -------------------
+1092          MDIN_ERROR_t MDINAUX_EnableMirrorV(PMDIN_VIDEO_INFO pINFO, BOOL OnOff)
+1093          {
+1094            PMDIN_SRCVIDEO_INFO pSRC = (PMDIN_SRCVIDEO_INFO)&pINFO->stSRC_x;
+1095            PMDIN_MFCSCALE_INFO pMFC = (PMDIN_MFCSCALE_INFO)&pINFO->stMFC_x;
+1096            WORD wVal = (OnOff)? pMFC->stMEM.h-1 : 0;
+1097          
+1098            if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x149, 0, 11, wVal)) return MDIN_I2C_ERROR;
+1099            if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x148, 14, 1, MBIT(OnOff,1))) return MDIN_I2C_ERROR;
+1100          
+1101            // inverse input field-id
+1102            wVal = MBIT(pSRC->fine,MDIN_HIGH_IS_TOPFLD);  wVal = (OnOff)? ~wVal : wVal;
+1103            if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x140, 5, 1, wVal&0x01)) return MDIN_I2C_ERROR;
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 20  
+
+1104            return MDIN_NO_ERROR;
+1105          }
+1106          */
+1107          #if defined(SYSTEM_USE_4D1_IN)
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              MDIN_ERROR_t MDINAUX_SetOut4CH_OutQuad(void)  // 01Aug2011
+              {
+                if (MDINHIF_RegField(MDIN_HOST_ID, 0x035, 12,  1,  1)) return MDIN_I2C_ERROR; // set axclk as video clock
+                if (MDINHIF_RegField(MDIN_HOST_ID, 0x045, 14,  2,  2)) return MDIN_I2C_ERROR; // set dac_clk as axclk
+              
+                if (MDINHIF_RegField(MDIN_HOST_ID, 0x047, 14,  2,  3)) return MDIN_I2C_ERROR; // set clk_aux_lm as axclk
+                
+                if (MDINHIF_RegField(MDIN_HOST_ID, 0x046,  3,  2,  2)) return MDIN_I2C_ERROR; // set clk_aux_out as axclk
+              
+                if (MDINHIF_RegField(MDIN_HOST_ID, 0x042,  2,  2,  3)) return MDIN_I2C_ERROR; // set vclk_src as axclk_sr
+             -c
+              
+              // modified on 29Feb2012
+              #if defined(IN_960H_MODE) // input 960H mode
+                // mpll divide for 162MHz
+                if (MDINHIF_RegField(MDIN_HOST_ID, 0x042, 10,  6,  2)) return MDIN_I2C_ERROR; // s
+                if (MDINHIF_RegField(MDIN_HOST_ID, 0x035,  0, 12,  2)) return MDIN_I2C_ERROR;   // t
+                if (MDINHIF_RegField(MDIN_HOST_ID, 0x036,  0, 12,  1)) return MDIN_I2C_ERROR;   // f
+              
+                #if defined(NTSC_4D1_IN)  // for NTSC input
+                  if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x088, 1286)) return MDIN_I2C_ERROR;  // main output htotal for 960H 
+             -NTSC input
+                  if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x08a, 1050)) return MDIN_I2C_ERROR;  // hactive end
+                  if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x176, 1235)) return MDIN_I2C_ERROR;  // aux output vtotal for 1900x1
+             -200@RB 60Hz(30Hz) output
+                #endif
+                #if defined(PAL_4D1_IN)   // for PAL input
+                  if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x088, 1296)) return MDIN_I2C_ERROR;  // main output htotal for 960H
+             - PAL input
+                  if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x08a, 1060)) return MDIN_I2C_ERROR;  // hactive end
+                  if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x176, 1482)) return MDIN_I2C_ERROR;  // aux output vtotal for 1900x1
+             -200@RB 50Hz(25Hz) output
+                #endif
+                // memory control - added on 29Feb2012
+                if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x1d5, 0xeaf2)) return MDIN_I2C_ERROR;
+                if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x1d6, 0x4c57)) return MDIN_I2C_ERROR;
+                if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x1d7, 0x5a71)) return MDIN_I2C_ERROR;
+              
+              #else   // input 720H mode
+              
+                // mpll divide for 115MHz
+                if (MDINHIF_RegField(MDIN_HOST_ID, 0x042, 10,  6,  3)) return MDIN_I2C_ERROR; // s
+                if (MDINHIF_RegField(MDIN_HOST_ID, 0x035,  0, 12,  2)) return MDIN_I2C_ERROR; // t
+                if (MDINHIF_RegField(MDIN_HOST_ID, 0x036,  0, 12,  1)) return MDIN_I2C_ERROR; // f
+              
+                #if defined(NTSC_4D1_IN)  // for NTSC input
+                  if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x088, 918)) return MDIN_I2C_ERROR;   // main output htotal for NTSC 
+             -input
+                  if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x176, 1250)) return MDIN_I2C_ERROR;    // aux output vtotal for 1600x
+             -1200@60Hz(30Hz) output
+                #endif
+                #if defined(PAL_4D1_IN)   // for PAL input
+                  if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x088, 926)) return MDIN_I2C_ERROR;   // main output htotal for PAL i
+             -nput
+                  if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x176, 1500)) return MDIN_I2C_ERROR;    // aux output vtotal for 1600x
+             -1200@50Hz(25Hz) output
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 21  
+
+                #endif
+              #endif
+              
+                return MDIN_NO_ERROR;
+              }
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              MDIN_ERROR_t MDINAUX_SetOut4CH_OutBT656(void) // 01Aug2011
+              {
+                if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x142,  7,  3,  3)) return MDIN_I2C_ERROR;
+                if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x142, 10,  1,  0)) return MDIN_I2C_ERROR;
+                if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x142, 13,  1,  1)) return MDIN_I2C_ERROR;
+              
+                if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x142,  3,  1,  1)) return MDIN_I2C_ERROR; // aux front v down-scaler
+             - bypass
+                if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x142,  4,  1,  1)) return MDIN_I2C_ERROR; // aux front h down-scaler
+             - bypass
+              
+                if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x144, 10,  1,  1)) return MDIN_I2C_ERROR; 
+                if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x145,  0,  3,  3)) return MDIN_I2C_ERROR;  // aux_pixel_repetition
+              
+                if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x147, 14, 2, 3)) return MDIN_I2C_ERROR; // multi-channel output mode
+              
+                if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x14a,  8,  4,  15)) return MDIN_I2C_ERROR; // aux_channel_en1~4
+                if (MDINHIF_RegField(MDIN_LOCAL_ID, 0x14a, 12,  4,  0)) return MDIN_I2C_ERROR; // aux_mwin_v, aux_mwin_h 
+             -(no mwin)
+              
+              #if defined(NTSC_4D1_IN)  // for NTSC input
+                if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x166, 720)) return MDIN_I2C_ERROR; // aux_mem_size_h
+                if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x167, 480)) return MDIN_I2C_ERROR; // aux_mem_size_v
+              
+                if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x168, 720)) return MDIN_I2C_ERROR; // aux_dest_size_h
+                if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x169, 480)) return MDIN_I2C_ERROR; // aux_dest_size_v
+              
+                if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x16c, 720)) return MDIN_I2C_ERROR; // aux_win_size_h
+                if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x16d, 480)) return MDIN_I2C_ERROR; // aux_win_size_v
+              #endif
+              #if defined(PAL_4D1_IN) // for PAL input
+                if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x166, 720)) return MDIN_I2C_ERROR; // aux_mem_size_h
+                if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x167, 576)) return MDIN_I2C_ERROR; // aux_mem_size_v
+              
+                if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x168, 720)) return MDIN_I2C_ERROR; // aux_dest_size_h
+                if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x169, 576)) return MDIN_I2C_ERROR; // aux_dest_size_v
+              
+                if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x16c, 720)) return MDIN_I2C_ERROR; // aux_win_size_h
+                if (MDINHIF_RegWrite(MDIN_LOCAL_ID, 0x16d, 576)) return MDIN_I2C_ERROR; // aux_win_size_v
+              #endif  
+                return MDIN_NO_ERROR;
+              }
+              #endif
+1202          /*  FILE_END_HERE */
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   7599    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      6     267
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----       1
+END OF MODULE INFORMATION.
+
+C51 COMPILER V9.60.7.0   MDINAUX                                                           12/22/2023 18:00:43 PAGE 22  
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,450 @@
+C51 COMPILER V9.60.7.0   I2C                                                               12/22/2023 18:00:40 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE I2C
+OBJECT MODULE PLACED IN .\obj\I2c.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE src\I2c.c LARGE OPTIMIZE(9,SIZE) BROWSE DEBUG OBJECTEXTEND PRINT(.\lst\I
+                    -2c.lst) TABS(2) OBJECT(.\obj\I2c.obj)
+
+line level    source
+
+   1          // *****************************************************
+   2          // Company : Techpoint Inc
+   3          // $Date: 2013-09-17 
+   4          // $Log:  $
+   5          // ******************************************************
+   6          
+   7          #include "inc\Config.h"
+   8          #include "inc\reg.h"
+   9          #include "inc\typedefs.h"
+  10          #include "inc\I2C.h"
+  11          #include "inc\main.h"
+  12          #include "inc\printf.h"
+  13          
+  14          #define I2C_SCL   P1_0
+  15          #define I2C_SDA   P1_1
+  16          #define MDC_UCOM  P1_2
+  17          #define MDIO_UCOM P1_3
+  18          #define I2C_FAST
+  19          
+  20          extern xdata BYTE TVII2CAddress;
+  21          
+  22          void delay1(WORD del)
+  23          {
+  24   1          while(del--);
+  25   1      }
+  26          
+  27          #ifdef I2C_FAST
+  28          
+  29           #define I2Cdelay()
+  30          #else
+               void I2Cdelay(void)
+               {
+                int i;
+                for (i=0;i<10;i++) {
+                  };
+              }
+              #endif
+  38          
+  39          //BYTE I2CWriteData_Wait(BYTE value);
+  40          BYTE I2C_byte_read(BYTE addr, BYTE index)
+  41          {
+  42   1        BYTE val;
+  43   1      /*
+  44   1        I2CStart();
+  45   1        I2CWriteData(addr);
+  46   1        //I2CWriteData(TVII2CAddress);
+  47   1        I2CWriteData(index);
+  48   1        I2CReStart();
+  49   1        I2CWriteData(TVII2CAddress | 0x01);
+  50   1        val = I2CReadData();
+  51   1        I2CStop();
+  52   1      */
+  53   1        
+  54   1        I2CSA =(BYTE)(addr);
+C51 COMPILER V9.60.7.0   I2C                                                               12/22/2023 18:00:40 PAGE 2   
+
+  55   1        I2CBUF =(BYTE)(index);
+  56   1        I2CCR = 0x03;
+  57   1        delay1(300);
+  58   1      
+  59   1        I2CSA = (BYTE)(addr|0x01);
+  60   1        I2CCR = 0x07;
+  61   1        delay1(500);
+  62   1        val = I2CBUF; 
+  63   1        return(val);
+  64   1      }
+  65          
+  66          void I2C_byte_write(BYTE addr, BYTE index, BYTE val)
+  67          {
+  68   1      /*  
+  69   1        I2CStart();
+  70   1        I2CWriteData(addr);
+  71   1        //I2CWriteData(TVII2CAddress);
+  72   1        I2CWriteData(index);
+  73   1        I2CWriteData(val);
+  74   1        I2CStop();
+  75   1      */
+  76   1          I2CSA = (BYTE)(addr);
+  77   1          I2CBUF = (BYTE)(index);
+  78   1          I2CCR = 0x03;
+  79   1          delay1(300);
+  80   1      
+  81   1          I2CBUF = (BYTE)(val);
+  82   1          I2CCR = 0x05;
+  83   1          delay1(500);  
+  84   1      }
+  85          
+  86          //BYTE tp28xx_byte_read(BYTE addr, BYTE index)
+  87          BYTE tp28xx_byte_read(BYTE index)
+  88          {
+  89   1      /*  
+  90   1        BYTE val;
+  91   1      
+  92   1        I2CStart();
+  93   1        //I2CWriteData(addr);
+  94   1        I2CWriteData(TVII2CAddress);
+  95   1        I2CWriteData(index);
+  96   1        I2CReStart();
+  97   1        I2CWriteData(TVII2CAddress | 0x01);
+  98   1        val = I2CReadData();
+  99   1        I2CStop();
+ 100   1      
+ 101   1        return val;
+ 102   1      */
+ 103   1        return I2C_byte_read(TVII2CAddress, index);
+ 104   1      }
+ 105          
+ 106          //void tp28xx_byte_write(BYTE addr, BYTE index, BYTE val)
+ 107          void tp28xx_byte_write(BYTE index, BYTE val)
+ 108          {
+ 109   1      /*  
+ 110   1        I2CStart();
+ 111   1        //I2CWriteData(addr);
+ 112   1        I2CWriteData(TVII2CAddress);
+ 113   1        I2CWriteData(index);
+ 114   1        I2CWriteData(val);
+ 115   1        I2CStop();
+ 116   1      */
+C51 COMPILER V9.60.7.0   I2C                                                               12/22/2023 18:00:40 PAGE 3   
+
+ 117   1        I2C_byte_write(TVII2CAddress, index, val);  
+ 118   1      }
+ 119          
+ 120          void WriteI2C16(BYTE addr, BYTE indexH, BYTE indexL, BYTE valH, BYTE valL)
+ 121          {
+ 122   1      /*  
+ 123   1        I2CStart();
+ 124   1        I2CWriteData(addr);
+ 125   1        I2CWriteData(indexH);
+ 126   1        I2CWriteData(indexL);
+ 127   1        I2CWriteData(valH);
+ 128   1        I2CWriteData(valL);
+ 129   1        I2CStop();
+ 130   1      */
+ 131   1        I2CSA = addr;
+ 132   1        I2CBUF = indexH;
+ 133   1        I2CCR = 0x03;
+ 134   1        delay1(300);    
+ 135   1        
+ 136   1        I2CBUF = indexL;
+ 137   1        I2CCR = 0x01;
+ 138   1        delay1(300);
+ 139   1        
+ 140   1        I2CBUF = valH;
+ 141   1        I2CCR = 0x01;
+ 142   1        delay1(500);  
+ 143   1        I2CBUF = valL;
+ 144   1        I2CCR = 0x05;
+ 145   1        delay1(500);      
+ 146   1      }
+ 147          
+ 148          WORD ReadI2C16(BYTE addr, BYTE indexH, BYTE indexL)
+ 149          {
+ 150   1        WORD val;
+ 151   1      /*
+ 152   1        I2CStart();
+ 153   1        I2CWriteData(addr);
+ 154   1        I2CWriteData(indexH);
+ 155   1        I2CWriteData(indexL);
+ 156   1        I2CReStart();
+ 157   1        I2CWriteData(addr | 0x01);
+ 158   1        val =(WORD) I2CReadDataWithACK();
+ 159   1        val <<=8;
+ 160   1        val =(WORD) I2CReadDataWithNAK();
+ 161   1        I2CStop();
+ 162   1      */
+ 163   1        I2CSA = addr;
+ 164   1        I2CBUF = indexH;
+ 165   1        I2CCR = 0x03;
+ 166   1        delay1(300);    
+ 167   1        
+ 168   1        I2CBUF = indexL;
+ 169   1        I2CCR = 0x01;
+ 170   1        delay1(300);
+ 171   1        
+ 172   1        I2CSA = addr|0x01;
+ 173   1        I2CCR = 0x03;
+ 174   1        delay1(500);  
+ 175   1        val = (WORD)I2CBUF<<8;
+ 176   1        I2CCR = 0x05;
+ 177   1        delay1(500);  
+ 178   1        val |= (WORD)I2CBUF;  
+C51 COMPILER V9.60.7.0   I2C                                                               12/22/2023 18:00:40 PAGE 4   
+
+ 179   1        return val;
+ 180   1      }
+ 181          /*
+ 182          BYTE WriteI2Cn(BYTE addr, BYTE index, BYTE *val, BYTE cnt)
+ 183          {
+ 184            BYTE rd=1, i;
+ 185          
+ 186            I2CStart();
+ 187            I2CWriteData(addr);
+ 188            I2CWriteData(index);
+ 189          
+ 190            for(i=0; i<cnt; i++)
+ 191              I2CWriteData(*(val+i));   //LJY050101
+ 192          
+ 193            I2CStop();
+ 194          
+ 195            return rd;
+ 196          }
+ 197          */
+ 198          /*
+ 199          BYTE WriteI2Cn_(BYTE addr, BYTE *val, BYTE cnt)
+ 200          {
+ 201            BYTE rd=1, i;
+ 202          
+ 203            I2CStart();
+ 204            I2CWriteData(addr);
+ 205          
+ 206            for(i=0; i<cnt; i++)
+ 207              I2CWriteData(*(val+i));   //LJY050101
+ 208          
+ 209            I2CStop();
+ 210          
+ 211            return rd;
+ 212          }
+ 213          */
+ 214          //BYTE I2CWriteData_Wait(BYTE value);
+ 215          /*
+ 216          void I2CReadByteMSP(BYTE addr, BYTE index, BYTE *pd, BYTE cnt)
+ 217          {
+ 218            BYTE i;
+ 219          
+ 220            I2CStart();
+ 221            I2CWriteData_Wait(addr);
+ 222            I2CWriteData(index);
+ 223            for(i=0; i<cnt; i++) {
+ 224              I2CWriteData(*(pd+i));
+ 225            }
+ 226            I2CStart();
+ 227            I2CWriteData_Wait(addr | 0x01);
+ 228            *pd = I2CReadDataWithACK();
+ 229            *(pd+1) = I2CReadData();
+ 230          
+ 231            I2CStop();
+ 232          }
+ 233          
+ 234          
+ 235          BYTE ReadI2CStatus( BYTE addr )
+ 236          {
+ 237            BYTE val;
+ 238          
+ 239            I2CStart();
+ 240            I2CWriteData(addr | 0x01);
+C51 COMPILER V9.60.7.0   I2C                                                               12/22/2023 18:00:40 PAGE 5   
+
+ 241            val = I2CReadData();
+ 242            I2CStop();
+ 243          
+ 244            return val;
+ 245          }
+ 246          */
+ 247          
+ 248          //BYTE I2CReadDataWithNAK(void)
+ 249          //{
+ 250          ////  return I2CReadData();
+ 251          //  int i;
+ 252          //  BYTE value=0;
+ 253          
+ 254          //  I2C_SDA = 1;  I2Cdelay();
+ 255          //  I2C_SCL = 0;
+ 256          
+ 257          //  for(i=0; i<8; i++) {
+ 258          //    I2C_SCL = 1;
+ 259          //    value <<= 1;
+ 260          //    if(I2C_SDA) value |= 1;
+ 261          //    I2C_SCL = 0;
+ 262          //  }
+ 263          //  I2C_SDA = 1;  I2Cdelay();   //nck
+ 264          //  I2C_SCL = 1;  I2Cdelay();
+ 265          //  I2C_SCL = 0;
+ 266          
+ 267          //  return value;
+ 268          //}
+ 269          
+ 270          //void ReadI2Cmn(BYTE addr, BYTE wcnt, BYTE rcnt, BYTE *rwdata)
+ 271          //{
+ 272          //  BYTE i;
+ 273          
+ 274          //  I2CStart();
+ 275          //  I2CWriteData(addr);
+ 276          //  for(i=0; i<wcnt; i++)
+ 277          //    I2CWriteData( rwdata[i] );
+ 278          
+ 279          //  I2CStart();
+ 280          //  I2CWriteData(addr | 0x01);
+ 281          //  for(i=0; i<rcnt-1; i++)
+ 282          //    rwdata[i] = I2CReadDataWithACK();
+ 283          //  rwdata[i++] = I2CReadDataWithNAK();
+ 284          //  I2CStop();
+ 285          //}
+ 286          
+ 287          
+ 288          /*****************************************************************************/
+ 289          /*                                                                           */
+ 290          /*****************************************************************************/
+ 291          /*
+ 292          BYTE I2CWriteData_Wait(BYTE value)
+ 293          {
+ 294            WORD i;
+ 295            BYTE ack;
+ 296          
+ 297            for(i=0; i<8; i++, value<<=1) {
+ 298              if(value & 0x80) I2C_SDA = 1;
+ 299              else       I2C_SDA = 0;
+ 300              I2Cdelay();
+ 301              I2C_SCL = 1;  I2Cdelay();
+ 302              I2C_SCL = 0;
+C51 COMPILER V9.60.7.0   I2C                                                               12/22/2023 18:00:40 PAGE 6   
+
+ 303            }
+ 304            I2C_SDA = 1;  I2Cdelay();
+ 305            I2C_SCL = 1;  I2Cdelay();
+ 306            i=0;
+ 307              while(1) {
+ 308              if( I2C_SCL ) break;
+ 309              i++;
+ 310            }
+ 311          
+ 312            ack = I2C_SDA;  //I2Cdelay();
+ 313            I2C_SCL = 0;
+ 314            return (1-ack);
+ 315          }
+ 316          */
+ 317          
+ 318          //void I2CStart()
+ 319          //{
+ 320          //  I2C_SCL = 1;  I2Cdelay();
+ 321          //  I2C_SDA = 1;  I2Cdelay();
+ 322          //  I2C_SDA = 0;  I2Cdelay();
+ 323          
+ 324          //}
+ 325          
+ 326          //void I2CReStart()
+ 327          //{
+ 328          //  I2C_SDA = 1;  I2Cdelay();
+ 329          //  I2C_SCL = 1;  I2Cdelay();
+ 330          //  I2C_SDA = 0;  I2Cdelay();
+ 331          
+ 332          //}
+ 333          
+ 334          
+ 335          //void I2CStop()
+ 336          //{
+ 337          //  I2C_SDA = 0;  I2Cdelay();
+ 338          //  I2C_SCL = 0;  I2Cdelay();
+ 339          //  I2C_SCL = 1;  I2Cdelay();
+ 340          //  I2C_SDA = 1;  I2Cdelay();
+ 341          ////  I2C_SCL = 1;  I2Cdelay();
+ 342          ////  I2C_SDA = 1;
+ 343          //}
+ 344          
+ 345          //void I2CWriteData(BYTE value)
+ 346          //{
+ 347          //  int i;
+ 348          
+ 349          //  for(i=0; i<8; i++){
+ 350          //    I2C_SCL = 0;
+ 351          //    I2Cdelay();
+ 352          //    if((value & 0x80) != 0) 
+ 353          //      I2C_SDA = 1;
+ 354          //    else       
+ 355          //      I2C_SDA = 0;
+ 356          //    I2Cdelay();
+ 357          //    I2C_SCL = 1;
+ 358          //    I2Cdelay();//vhuang
+ 359          //    I2C_SCL = 0;
+ 360          //    I2Cdelay();
+ 361          //    value<<=1;
+ 362          //  }
+ 363          //  I2C_SCL = 0;    I2Cdelay();
+ 364          //  I2C_SCL = 1;    I2Cdelay();
+C51 COMPILER V9.60.7.0   I2C                                                               12/22/2023 18:00:40 PAGE 7   
+
+ 365          //  I2C_SCL = 0;    I2Cdelay();
+ 366          //}
+ 367          
+ 368          //BYTE I2CReadData()
+ 369          //{
+ 370          //  int i;
+ 371          //  BYTE value=0;
+ 372          
+ 373          //  
+ 374          //  for(i=0; i<8; i++) {
+ 375          //    I2C_SCL = 0;
+ 376          //    I2Cdelay();
+ 377          //    I2C_SCL = 1;
+ 378          //    value <<= 1;
+ 379          //    if(I2C_SDA) value |= 1;
+ 380          //    I2Cdelay();
+ 381          //    I2C_SCL = 0;
+ 382          //    I2Cdelay();
+ 383          //  }
+ 384          
+ 385          //  I2C_SCL = 0;  I2Cdelay();
+ 386          //  I2C_SCL = 1;  I2Cdelay();
+ 387          //  I2C_SCL = 0;  I2Cdelay();
+ 388          
+ 389          //  return value;
+ 390          
+ 391          //}
+ 392          
+ 393          //BYTE I2CReadDataWithACK()
+ 394          //{
+ 395          //  int i;
+ 396          //  BYTE value=0;
+ 397          
+ 398          //  I2C_SDA = 1;  I2Cdelay();
+ 399          //  I2C_SCL = 0;
+ 400          
+ 401          //  for(i=0; i<8; i++) {
+ 402          //    I2C_SCL = 1;
+ 403          //    value <<= 1;
+ 404          //    if(I2C_SDA) value |= 1;
+ 405          //    I2C_SCL = 0;
+ 406          //  }
+ 407          //  I2C_SDA = 0;  I2Cdelay();   //ack
+ 408          //  I2C_SCL = 1;  I2Cdelay();
+ 409          //  I2C_SCL = 0;
+ 410          
+ 411          //  return value;
+ 412          //}
+ 413          
+ 414          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    179    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----       5
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

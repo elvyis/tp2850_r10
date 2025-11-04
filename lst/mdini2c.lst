@@ -1,0 +1,594 @@
+C51 COMPILER V9.60.7.0   MDINI2C                                                           12/22/2023 18:00:42 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MDINI2C
+OBJECT MODULE PLACED IN .\obj\mdini2c.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE src\MDIN3xx\mdini2c.c LARGE OPTIMIZE(9,SIZE) BROWSE DEBUG OBJECTEXTEND P
+                    -RINT(.\lst\mdini2c.lst) TABS(2) OBJECT(.\obj\mdini2c.obj)
+
+line level    source
+
+   1          //--------------------------------------------------------------------------------------------------------
+             ---------------
+   2          // (C) Copyright 2010  Macro Image Technology Co., LTd. , All rights reserved
+   3          // 
+   4          // This source code is the property of Macro Image Technology and is provided
+   5          // pursuant to a Software License Agreement. This code's reuse and distribution
+   6          // without Macro Image Technology's permission is strictly limited by the confidential
+   7          // information provisions of the Software License Agreement.
+   8          //--------------------------------------------------------------------------------------------------------
+             ----------------
+   9          //
+  10          // File Name      : MDINI2C.C
+  11          // Description    :
+  12          // Ref. Docment   : 
+  13          // Revision History   :
+  14          
+  15          // ----------------------------------------------------------------------
+  16          // Include files
+  17          // ----------------------------------------------------------------------
+  18          #include  "mdin3xx.h"
+  19          #include  "..\inc\reg.h"
+  20          // ----------------------------------------------------------------------
+  21          // Struct/Union Types and define
+  22          // ----------------------------------------------------------------------
+  23          #define   I2C_OK        0
+  24          #define   I2C_NOT_FREE    1
+  25          #define   I2C_HOST_NACK   2
+  26          #define   I2C_TIME_OUT    3
+  27          
+  28          // ----------------------------------------------------------------------
+  29          // Static Global Data section variables
+  30          // ----------------------------------------------------------------------
+  31          static data WORD PageID = 0;
+  32          
+  33          // ----------------------------------------------------------------------
+  34          // External Variable 
+  35          // ----------------------------------------------------------------------
+  36          extern void I2CStart(void);
+  37          void I2CReStart(void);
+  38          
+  39          extern void I2CWriteData(BYTE value);
+  40          extern BYTE I2CReadData(void);
+  41          extern BYTE I2CReadDataWithACK(void);
+  42          extern BYTE I2CReadDataWithNAK(void);
+  43          extern void I2CStop(void);
+  44          extern void delay1(WORD);
+  45          // ----------------------------------------------------------------------
+  46          // Static Prototype Functions
+  47          // ----------------------------------------------------------------------
+  48          
+  49          // user i2c functions
+  50          static BYTE MDINI2C_Write(BYTE nID, WORD rAddr, PBYTE pBuff, WORD bytes);
+  51          static BYTE MDINI2C_Read(BYTE nID, WORD rAddr, PBYTE pBuff, WORD bytes);
+  52          
+C51 COMPILER V9.60.7.0   MDINI2C                                                           12/22/2023 18:00:42 PAGE 2   
+
+  53          // ----------------------------------------------------------------------
+  54          // Static functions
+  55          // ----------------------------------------------------------------------
+  56          
+  57          //--------------------------------------------------------------------------------------------------------
+             -------------------
+  58          static BYTE MDINI2C_SetPage(BYTE nID, WORD page)
+  59          {
+  60   1      #if defined(SYSTEM_USE_MDIN380)&&defined(SYSTEM_USE_BUS_HIF)
+                MDINBUS_SetPageID(page);  // set pageID to BUS-IF
+              #endif
+  63   1      
+  64   1        if (page==PageID) return I2C_OK;  PageID = page;
+  65   1        return MDINI2C_Write(nID, 0x400, (PBYTE)&page, 2);  // write page
+  66   1      }
+  67          
+  68          //--------------------------------------------------------------------------------------------------------
+             -------------------
+  69          static BYTE MHOST_I2CWrite(WORD rAddr, PBYTE pBuff, WORD bytes)
+  70          {
+  71   1        BYTE err = I2C_OK;
+  72   1      
+  73   1        err = MDINI2C_SetPage(MDIN_HOST_ID, 0x0000);  // write host page
+  74   1        if (err) return err;
+  75   1      
+  76   1        err = MDINI2C_Write(MDIN_HOST_ID, rAddr, pBuff, bytes);
+  77   1        return err;
+  78   1      }
+  79          
+  80          //--------------------------------------------------------------------------------------------------------
+             -------------------
+  81          static BYTE MHOST_I2CRead(WORD rAddr, PBYTE pBuff, WORD bytes)
+  82          {
+  83   1        BYTE err = I2C_OK;
+  84   1      
+  85   1        err = MDINI2C_SetPage(MDIN_HOST_ID, 0x0000);  // write host page
+  86   1        if (err) return err;
+  87   1      
+  88   1        err = MDINI2C_Read(MDIN_HOST_ID, rAddr, pBuff, bytes);
+  89   1        return err;
+  90   1      }
+  91          
+  92          //--------------------------------------------------------------------------------------------------------
+             -------------------
+  93          static BYTE LOCAL_I2CWrite(WORD rAddr, PBYTE pBuff, WORD bytes)
+  94          {
+  95   1        BYTE err = I2C_OK;
+  96   1      
+  97   1        err = MDINI2C_SetPage(MDIN_LOCAL_ID, 0x0101); // write local page
+  98   1        if (err) return err;
+  99   1      
+ 100   1        err = MDINI2C_Write(MDIN_LOCAL_ID, rAddr, pBuff, bytes);
+ 101   1        return err;
+ 102   1      }
+ 103          
+ 104          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 105          static BYTE LOCAL_I2CRead(WORD rAddr, PBYTE pBuff, WORD bytes)
+ 106          {
+ 107   1        WORD RegOEN, err = I2C_OK;
+ 108   1      
+ 109   1        if    (rAddr>=0x030&&rAddr<0x036) RegOEN = 0x04;  // mfc-size
+C51 COMPILER V9.60.7.0   MDINI2C                                                           12/22/2023 18:00:42 PAGE 3   
+
+ 110   1        else if (rAddr>=0x043&&rAddr<0x045) RegOEN = 0x09;  // out-ptrn
+ 111   1        else if (rAddr>=0x062&&rAddr<0x083) RegOEN = 0x09;  // enhance
+ 112   1        else if (rAddr>=0x088&&rAddr<0x092) RegOEN = 0x09;  // out-sync
+ 113   1        else if (rAddr>=0x094&&rAddr<0x097) RegOEN = 0x09;  // out-sync
+ 114   1        else if (rAddr>=0x09a&&rAddr<0x09c) RegOEN = 0x09;  // bg-color
+ 115   1        else if (rAddr>=0x0a0&&rAddr<0x0d0) RegOEN = 0x09;  // out-ctrl
+ 116   1        else if (              rAddr<0x100) RegOEN = 0x01;  // in-sync
+ 117   1        else if (rAddr>=0x100&&rAddr<0x140) RegOEN = 0x05;  // main-fc
+ 118   1        else if (rAddr>=0x140&&rAddr<0x1a0) RegOEN = 0x07;  // aux
+ 119   1        else if (rAddr>=0x1a0&&rAddr<0x1c0) RegOEN = 0x03;  // arbiter
+ 120   1        else if (rAddr>=0x1c0&&rAddr<0x1e0) RegOEN = 0x02;  // fc-mc
+ 121   1        else if (rAddr>=0x1e0&&rAddr<0x1f8) RegOEN = 0x08;  // encoder
+ 122   1        else if (rAddr>=0x1f8&&rAddr<0x200) RegOEN = 0x0a;  // audio
+ 123   1        else if (rAddr>=0x200&&rAddr<0x280) RegOEN = 0x04;  // ipc
+ 124   1        else if (rAddr>=0x2a0&&rAddr<0x300) RegOEN = 0x07;  // aux-osd
+ 125   1        else if (rAddr>=0x300&&rAddr<0x380) RegOEN = 0x06;  // osd
+ 126   1        else if (rAddr>=0x3c0&&rAddr<0x3f8) RegOEN = 0x09;  // enhance
+ 127   1        else                RegOEN = 0x00;  // host state
+ 128   1      
+ 129   1        err = LOCAL_I2CWrite(0x3ff, (PBYTE)&RegOEN, 2); // write reg_oen
+ 130   1        if (err) return err;
+ 131   1      
+ 132   1        err = MDINI2C_Read(MDIN_LOCAL_ID, rAddr, pBuff, bytes);
+ 133   1        return err;
+ 134   1      }
+ 135          
+ 136          #if defined(SYSTEM_USE_MDIN340)||defined(SYSTEM_USE_MDIN380)
+ 137          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 138          static BYTE MHDMI_I2CWrite(WORD rAddr, PBYTE pBuff, WORD bytes)
+ 139          {
+ 140   1        BYTE err = I2C_OK;
+ 141   1      
+ 142   1        err = MDINI2C_SetPage(MDIN_HDMI_ID, 0x0202);  // write hdmi page
+ 143   1        if (err) return err;
+ 144   1      
+ 145   1        err = MDINI2C_Write(MDIN_HDMI_ID, rAddr/2, (PBYTE)pBuff, bytes);
+ 146   1        return err;
+ 147   1      }
+ 148          
+ 149          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 150          static BYTE MHDMI_GetWriteDone(void)
+ 151          {
+ 152   1        WORD rVal = 0, count = 100, err = I2C_OK;
+ 153   1      
+ 154   1        while (count&&(rVal==0)) {
+ 155   2          err = MDINI2C_Read(MDIN_HDMI_ID, 0x027, (PBYTE)&rVal, 2);
+ 156   2          if (err) return err;  rVal &= 0x04; count--;
+ 157   2        }
+ 158   1        return (count)? I2C_OK : I2C_TIME_OUT;
+ 159   1      }
+ 160          
+ 161          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 162          static BYTE MHDMI_HOSTRead(WORD rAddr, PBYTE pBuff)
+ 163          {
+ 164   1        WORD rData, err = I2C_OK;
+ 165   1      
+ 166   1        err = MDINI2C_SetPage(MDIN_HOST_ID, 0x0000);  // write host page
+ 167   1        if (err) return err;
+ 168   1      
+C51 COMPILER V9.60.7.0   MDINI2C                                                           12/22/2023 18:00:42 PAGE 4   
+
+ 169   1        err = MDINI2C_Write(MDIN_HOST_ID, 0x025, (PBYTE)&rAddr, 2);
+ 170   1        if (err) return err;  rData = 0x0003;
+ 171   1        err = MDINI2C_Write(MDIN_HOST_ID, 0x027, (PBYTE)&rData, 2);
+ 172   1        if (err) return err;  rData = 0x0002;
+ 173   1        err = MDINI2C_Write(MDIN_HOST_ID, 0x027, (PBYTE)&rData, 2);
+ 174   1        if (err) return err;
+ 175   1      
+ 176   1        // check done flag
+ 177   1        err = MHDMI_GetWriteDone(); if (err) {mdinERR = 4; return err;}
+ 178   1        
+ 179   1        err = MDINI2C_Read(MDIN_HOST_ID, 0x026, (PBYTE)pBuff, 2);
+ 180   1        return err;
+ 181   1      }
+ 182          
+ 183          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 184          static BYTE MHDMI_I2CRead(WORD rAddr, PBYTE pBuff, WORD bytes)
+ 185          {
+ 186   1        BYTE err = I2C_OK;
+ 187   1      
+ 188   1        // DDC_STATUS, DDC_FIFOCNT
+ 189   1        if (rAddr==0x0f2||rAddr==0x0f5) return MHDMI_HOSTRead(rAddr, pBuff);
+ 190   1      
+ 191   1        err = MDINI2C_SetPage(MDIN_HDMI_ID, 0x0202);  // write hdmi page
+ 192   1        if (err) return err;
+ 193   1      
+ 194   1        err = MDINI2C_Read(MDIN_HDMI_ID, rAddr/2, (PBYTE)pBuff, bytes);
+ 195   1        return err;
+ 196   1      }
+ 197          #endif  /* defined(SYSTEM_USE_MDIN340)||defined(SYSTEM_USE_MDIN380) */
+ 198          
+ 199          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 200          /*
+ 201          static BYTE SDRAM_I2CWrite(DWORD rAddr, PBYTE pBuff, DWORD bytes)
+ 202          {
+ 203            WORD row, len, idx, unit, err = I2C_OK;
+ 204          
+ 205            err = MDINI2C_RegRead(MDIN_HOST_ID, 0x005, &unit);  if (err) return err;
+ 206            unit = (unit&0x0100)? 4096 : 2048;
+ 207          
+ 208            while (bytes>0) {
+ 209              row = ADDR2ROW(rAddr, unit);  // get row
+ 210              idx = ADDR2COL(rAddr, unit);  // get col
+ 211              len = MIN((unit/2)-(rAddr%(unit/2)), bytes);
+ 212          
+ 213              err = MDINI2C_RegWrite(MDIN_HOST_ID, 0x003, row); if (err) return err;  // host access
+ 214              err = MDINI2C_SetPage(MDIN_HOST_ID, 0x0303); if (err) return err; // write sdram page
+ 215              err = MDINI2C_Write(MDIN_SDRAM_ID, idx/2, (PBYTE)pBuff, len); if (err) return err;
+ 216              bytes-=len; rAddr+=len; pBuff+=len;
+ 217            }
+ 218            return err;
+ 219          }
+ 220          
+ 221          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 222          static BYTE SDRAM_I2CRead(DWORD rAddr, PBYTE pBuff, DWORD bytes)
+ 223          {
+ 224            WORD row, len, idx, unit, err = I2C_OK;
+ 225          
+ 226            err = MDINI2C_RegRead(MDIN_HOST_ID, 0x005, &unit);  if (err) return err;
+ 227            unit = (unit&0x0100)? 4096 : 2048;
+C51 COMPILER V9.60.7.0   MDINI2C                                                           12/22/2023 18:00:42 PAGE 5   
+
+ 228          
+ 229            while (bytes>0) {
+ 230              row = ADDR2ROW(rAddr, unit);  // get row
+ 231              idx = ADDR2COL(rAddr, unit);  // get col
+ 232              len = MIN((unit/2)-(rAddr%(unit/2)), bytes);
+ 233          
+ 234              err = MDINI2C_RegWrite(MDIN_HOST_ID, 0x003, row); if (err) return err;  // host access
+ 235              err = MDINI2C_SetPage(MDIN_HOST_ID, 0x0303); if (err) return err; // write sdram page
+ 236              err = MDINI2C_Read(MDIN_SDRAM_ID, idx/2, (PBYTE)pBuff, len); if (err) return err;
+ 237              bytes-=len; rAddr+=len; pBuff+=len;
+ 238            }
+ 239            return err;
+ 240          }
+ 241          */
+ 242          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 243          static BYTE I2C_WriteByID(BYTE nID, DWORD rAddr, PBYTE pBuff, DWORD bytes)
+ 244          {
+ 245   1        BYTE err = I2C_OK;
+ 246   1      
+ 247   1        switch (nID&0xfe) {
+ 248   2          case MDIN_HOST_ID:  err = MHOST_I2CWrite(rAddr, (PBYTE)pBuff, bytes); break;
+ 249   2          case MDIN_LOCAL_ID: err = LOCAL_I2CWrite(rAddr, (PBYTE)pBuff, bytes); break;
+ 250   2          //case MDIN_SDRAM_ID: err = SDRAM_I2CWrite(rAddr, (PBYTE)pBuff, bytes); break;
+ 251   2      
+ 252   2        #if defined(SYSTEM_USE_MDIN340)||defined(SYSTEM_USE_MDIN380)
+ 253   2          case MDIN_HDMI_ID:  err = MHDMI_I2CWrite(rAddr, (PBYTE)pBuff, bytes); break;
+ 254   2        #endif
+ 255   2      
+ 256   2        }
+ 257   1        return err;
+ 258   1      }
+ 259          
+ 260          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 261          static BYTE I2C_ReadByID(BYTE nID, DWORD rAddr, PBYTE pBuff, DWORD bytes)
+ 262          {
+ 263   1        BYTE err = I2C_OK;
+ 264   1      
+ 265   1        switch (nID&0xfe) {
+ 266   2          case MDIN_HOST_ID:  err = MHOST_I2CRead(rAddr, (PBYTE)pBuff, bytes); break;
+ 267   2          case MDIN_LOCAL_ID: err = LOCAL_I2CRead(rAddr, (PBYTE)pBuff, bytes); break;
+ 268   2          //case MDIN_SDRAM_ID: err = SDRAM_I2CRead(rAddr, (PBYTE)pBuff, bytes); break;
+ 269   2      
+ 270   2        #if defined(SYSTEM_USE_MDIN340)||defined(SYSTEM_USE_MDIN380)
+ 271   2          case MDIN_HDMI_ID:  err = MHDMI_I2CRead(rAddr, (PBYTE)pBuff, bytes); break;
+ 272   2        #endif
+ 273   2      
+ 274   2        }
+ 275   1        return err;
+ 276   1      }
+ 277          
+ 278          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 279          #if defined(SYSTEM_USE_MDIN380)&&defined(SYSTEM_USE_BUS_HIF)
+              MDIN_ERROR_t MDINI2C_SetPageID(WORD nID)
+              {
+                PageID = nID;
+                return MDIN_NO_ERROR;
+              }
+              #endif
+ 286          
+C51 COMPILER V9.60.7.0   MDINI2C                                                           12/22/2023 18:00:42 PAGE 6   
+
+ 287          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 288          MDIN_ERROR_t MDINI2C_MultiWrite(BYTE nID, DWORD rAddr, PBYTE pBuff, DWORD bytes)
+ 289          {
+ 290   1        return (I2C_WriteByID(nID, rAddr, (PBYTE)pBuff, bytes))? MDIN_I2C_ERROR : MDIN_NO_ERROR;
+ 291   1      }
+ 292          
+ 293          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 294          MDIN_ERROR_t MDINI2C_RegWrite(BYTE nID, DWORD rAddr, WORD wData)
+ 295          {
+ 296   1        return (MDINI2C_MultiWrite(nID, rAddr, (PBYTE)&wData, 2))? MDIN_I2C_ERROR : MDIN_NO_ERROR;
+ 297   1      }
+ 298          
+ 299          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 300          MDIN_ERROR_t MDINI2C_MultiRead(BYTE nID, DWORD rAddr, PBYTE pBuff, DWORD bytes)
+ 301          {
+ 302   1        return (I2C_ReadByID(nID, rAddr, (PBYTE)pBuff, bytes))? MDIN_I2C_ERROR : MDIN_NO_ERROR;
+ 303   1      }
+ 304          
+ 305          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 306          MDIN_ERROR_t MDINI2C_RegRead(BYTE nID, DWORD rAddr, PWORD rData)
+ 307          {
+ 308   1        return (MDINI2C_MultiRead(nID, rAddr, (PBYTE)rData, 2))? MDIN_I2C_ERROR : MDIN_NO_ERROR;
+ 309   1      }
+ 310          
+ 311          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 312          MDIN_ERROR_t MDINI2C_RegField(BYTE nID, DWORD rAddr, WORD bPos, WORD bCnt, WORD bData)
+ 313          {
+ 314   1        WORD temp;
+ 315   1      
+ 316   1        if (bPos>15||bCnt==0||bCnt>16||(bPos+bCnt)>16) return MDIN_INVALID_PARAM;
+ 317   1        if (MDINI2C_RegRead(nID, rAddr, &temp)) return MDIN_I2C_ERROR;
+ 318   1        bCnt = ~(0xffff<<bCnt);
+ 319   1        temp &= ~(bCnt<<bPos);
+ 320   1        temp |= ((bData&bCnt)<<bPos);
+ 321   1        return (MDINI2C_RegWrite(nID, rAddr, temp))? MDIN_I2C_ERROR : MDIN_NO_ERROR;
+ 322   1      }
+ 323          
+ 324          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 325          // Drive Function for I2C read & I2C write
+ 326          // User must make functions which is defined below.
+ 327          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 328          #if 0 // for TI cortex-m3 cpu i2c function
+              static BYTE MDINI2C_GetError(BOOL bRX)
+              {
+                if (bRX) bRX = I2C_MASTER_CMD_BURST_RECEIVE_ERROR_STOP;
+                else   bRX = I2C_MASTER_CMD_BURST_SEND_ERROR_STOP;
+              
+                if (I2CMasterErr(I2C0_MASTER_BASE)==0) return I2C_OK;
+                I2CMasterControl(I2C0_MASTER_BASE, bRX);
+                return I2C_HOST_NACK;
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static BYTE MDINI2C_SendAddr(BYTE sAddr, WORD rAddr)
+C51 COMPILER V9.60.7.0   MDINI2C                                                           12/22/2023 18:00:42 PAGE 7   
+
+              {
+                I2CMasterDataPut(I2C0_MASTER_BASE, HIBYTE(rAddr));  // start+slave+addr(msb)
+                I2CMasterControl(I2C0_MASTER_BASE, I2C_MASTER_CMD_BURST_SEND_START);
+                while (I2CMasterBusy(I2C0_MASTER_BASE));
+                if (MDINI2C_GetError(false)) return I2C_HOST_NACK;
+              
+                I2CMasterDataPut(I2C0_MASTER_BASE, LOBYTE(rAddr));  // addr(lsb)
+                I2CMasterControl(I2C0_MASTER_BASE, I2C_MASTER_CMD_BURST_SEND_CONT);
+                while (I2CMasterBusy(I2C0_MASTER_BASE));
+                return MDINI2C_GetError(false);
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static BYTE MDINI2C_SendByte(BYTE data, BOOL last)
+              {
+                if (last) last = I2C_MASTER_CMD_BURST_SEND_FINISH;
+                else    last = I2C_MASTER_CMD_BURST_SEND_CONT;
+              
+                I2CMasterDataPut(I2C0_MASTER_BASE, data);
+                I2CMasterControl(I2C0_MASTER_BASE, last);
+                while (I2CMasterBusy(I2C0_MASTER_BASE));
+                return MDINI2C_GetError(false);
+              }
+              
+              //--------------------------------------------------------------------------------------------------------
+             -------------------
+              static BYTE MDINI2C_GetByte(BOOL first, BOOL last)  // last == 1 for last byte
+              {
+                BYTE read, cmd = 0;
+              
+                if (first==1&&last== ACK) cmd = I2C_MASTER_CMD_BURST_RECEIVE_START;
+                if (first==1&&last==NACK) cmd = I2C_MASTER_CMD_SINGLE_RECEIVE;
+                if (first==0&&last== ACK) cmd = I2C_MASTER_CMD_BURST_RECEIVE_CONT;
+                if (first==0&&last==NACK) cmd = I2C_MASTER_CMD_BURST_RECEIVE_FINISH;
+              
+                I2CMasterControl(I2C0_MASTER_BASE, cmd);
+                while (I2CMasterBusy(I2C0_MASTER_BASE));
+                read = I2CMasterDataGet(I2C0_MASTER_BASE);
+                MDINI2C_GetError(true);
+                return read;
+              }
+              #endif
+ 382          
+ 383          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 384          static BYTE MDINI2C_Write(BYTE nID, WORD rAddr, PBYTE pBuff, WORD bytes)
+ 385          {
+ 386   1        WORD i; 
+ 387   1        //BYTE sAddr = I2C_MDIN3xx_ADDR;
+ 388   1      
+ 389   1      #if 1 // add user i2c function
+ 390   1      
+ 391   1        // 0. check i2c  line is ready for use and it is not corrupted
+ 392   1        // 1. start condition (S)
+ 393   1        // 2. i2c slave address byte (R/W bit = low)
+ 394   1        // 3. i2c host address byte 1 (MSB) A(10:8)
+ 395   1        // 4. i2c host address byte 0 (LSB) A(7:0)
+ 396   1        // 5. re-start condition (Sr)   (* optional)
+ 397   1        // 6. i2c slave address byte (R/W bit = high) (* optional)
+ 398   1      //  I2CStart();
+ 399   1      //  I2CWriteData(I2C_MDIN3xx_ADDR);
+C51 COMPILER V9.60.7.0   MDINI2C                                                           12/22/2023 18:00:42 PAGE 8   
+
+ 400   1      //  I2CWriteData(rAddr>>8);
+ 401   1      //  I2CWriteData(rAddr&0xff);
+ 402   1        I2CSA = I2C_MDIN3xx_ADDR;
+ 403   1        I2CBUF = (rAddr>>8);
+ 404   1        I2CCR = 0x03;
+ 405   1        delay1(300);    
+ 406   1        
+ 407   1        I2CBUF = (rAddr&0xff);
+ 408   1        I2CCR = 0x01;
+ 409   1        delay1(300);
+ 410   1        for (i=0; i<bytes/2-1; i++) { // for multi register write
+ 411   2      //    // 7. i2c write data byte 1 (MSB) D(15:8)
+ 412   2      //    // 8. i2c write data byte 0 (MSB) D(7:0)
+ 413   2      //    I2CWriteData(HIBYTE(((PWORD)pBuff)[i]));
+ 414   2      //    I2CWriteData(LOBYTE(((PWORD)pBuff)[i]));
+ 415   2        I2CBUF = HIBYTE(((PWORD)pBuff)[i]);
+ 416   2        I2CCR = 0x01;
+ 417   2        delay1(500);  
+ 418   2        I2CBUF = LOBYTE(((PWORD)pBuff)[i]);
+ 419   2        I2CCR = 0x01;
+ 420   2        delay1(500);        
+ 421   2        }
+ 422   1        I2CBUF = HIBYTE(((PWORD)pBuff)[i]);
+ 423   1        I2CCR = 0x01;
+ 424   1        delay1(500);  
+ 425   1        I2CBUF = LOBYTE(((PWORD)pBuff)[i]);
+ 426   1        I2CCR = 0x05;
+ 427   1        delay1(500);          
+ 428   1      //  // 9. stop condition (P)
+ 429   1      //  I2CStop();  
+ 430   1      //  I2CCR = 0x04;
+ 431   1      
+ 432   1      #else // for TI cortex-m3 cpu i2c function
+              
+                // check i2c  line is ready for use and it is not corrupted
+                if (I2CMasterBusBusy(I2C0_MASTER_BASE)) return I2C_NOT_FREE;
+              
+                I2CMasterSlaveAddrSet(I2C0_MASTER_BASE, sAddr>>1, false);
+                if (MDINI2C_SendAddr(sAddr, rAddr*1)) return I2C_HOST_NACK; // start+slave+addr
+              
+                for (i=0; i<bytes/2-1; i++) {
+                  if (MDINI2C_SendByte(HIBYTE(((PWORD)pBuff)[i]), ACK)) return I2C_HOST_NACK; // Transmit a buffer data
+                  if (MDINI2C_SendByte(LOBYTE(((PWORD)pBuff)[i]), ACK)) return I2C_HOST_NACK; // Transmit a buffer data
+                }
+                if (MDINI2C_SendByte(HIBYTE(((PWORD)pBuff)[i]),  ACK)) return I2C_HOST_NACK;  // Transmit a buffer data
+                if (MDINI2C_SendByte(LOBYTE(((PWORD)pBuff)[i]), NACK)) return I2C_HOST_NACK;  // Transmit a buffer data
+                
+              #endif
+ 448   1      
+ 449   1        return I2C_OK;
+ 450   1      }
+*** WARNING C280 IN LINE 384 OF src\MDIN3xx\mdini2c.c: 'nID': unreferenced local variable
+ 451          
+ 452          //--------------------------------------------------------------------------------------------------------
+             -------------------
+ 453          static BYTE MDINI2C_Read(BYTE nID, WORD rAddr, PBYTE pBuff, WORD bytes)
+ 454          {
+ 455   1        WORD i; 
+ 456   1        //BYTE sAddr = I2C_MDIN3xx_ADDR;
+ 457   1      
+ 458   1      #if 1 // add user i2c function
+ 459   1      
+C51 COMPILER V9.60.7.0   MDINI2C                                                           12/22/2023 18:00:42 PAGE 9   
+
+ 460   1        // 0. check i2c  line is ready for use and it is not corrupted
+ 461   1        // 1. start condition (S)
+ 462   1        // 2. i2c slave address byte (R/W bit = low)
+ 463   1        // 3. i2c host address byte 1 (MSB) A(10:8)
+ 464   1        // 4. i2c host address byte 0 (LSB) A(7:0)
+ 465   1        // 5. re-start condition (Sr)
+ 466   1        // 6. i2c slave address byte (R/W bit = high)
+ 467   1      //  I2CStart();
+ 468   1      //  I2CWriteData(I2C_MDIN3xx_ADDR);
+ 469   1      //  I2CWriteData(rAddr>>8);
+ 470   1      //  I2CWriteData(rAddr&0xff);
+ 471   1      //  I2CReStart();
+ 472   1      //  I2CWriteData(I2C_MDIN3xx_ADDR | 0x01);
+ 473   1        I2CSA = I2C_MDIN3xx_ADDR;
+ 474   1        I2CBUF = rAddr>>8;
+ 475   1        I2CCR = 0x03;
+ 476   1        delay1(300);
+ 477   1        
+ 478   1        I2CBUF = rAddr&0xff;
+ 479   1        I2CCR = 0x01;
+ 480   1        delay1(300);  
+ 481   1        
+ 482   1        I2CSA = I2C_MDIN3xx_ADDR | 0x01;
+ 483   1        I2CCR = 0x03;
+ 484   1        delay1(500);  
+ 485   1        for (i=0; i<bytes/2-1; i++) { // for multi register read
+ 486   2          // 7. i2c read data byte 1 (MSB) D(15:8)
+ 487   2          // 8. i2c read data byte 0 (MSB) D(7:0)
+ 488   2          ((PWORD)pBuff)[i] = (WORD)I2CBUF<<8;
+ 489   2          I2CCR = 0x01;
+ 490   2          delay1(500);    
+ 491   2          ((PWORD)pBuff)[i] |= (WORD)I2CBUF;
+ 492   2          I2CCR = 0x01;
+ 493   2          delay1(500);
+ 494   2        }
+ 495   1          ((PWORD)pBuff)[i] = (WORD)I2CBUF<<8;
+ 496   1          I2CCR = 0x05;
+ 497   1          delay1(500);  
+ 498   1          ((PWORD)pBuff)[i] |= (WORD)I2CBUF;
+ 499   1        // 9. stop condition (P)
+ 500   1      //  I2CStop();  
+ 501   1      #else   // for TI cortex-m3 cpu i2c function
+              
+                // check i2c  line is ready for use and it is not corrupted
+                if (I2CMasterBusBusy(I2C0_MASTER_BASE)) return I2C_NOT_FREE;
+              
+                I2CMasterSlaveAddrSet(I2C0_MASTER_BASE, sAddr>>1, false);
+                if (MDINI2C_SendAddr(sAddr, rAddr*1)) return I2C_HOST_NACK; // start+slave+addr
+                I2CMasterSlaveAddrSet(I2C0_MASTER_BASE, sAddr>>1, true);  // slave|read
+              
+                for (i=0; i<bytes/2-1; i++) {
+                  ((PWORD)pBuff)[i]  = ((WORD)MDINI2C_GetByte((i)? 0:1, ACK))<<8;   // Receive a buffer data
+                  ((PWORD)pBuff)[i] |= ((WORD)MDINI2C_GetByte(       0, ACK))<<0;   // Receive a buffer data
+                }
+                ((PWORD)pBuff)[i]  = ((WORD)MDINI2C_GetByte((i)? 0:1,  ACK))<<8;    // Receive a buffer data
+                ((PWORD)pBuff)[i] |= ((WORD)MDINI2C_GetByte(       0, NACK))<<0;    // Receive a buffer data
+                
+              #endif
+ 518   1      
+ 519   1        return I2C_OK;
+ 520   1      }
+*** WARNING C280 IN LINE 453 OF src\MDIN3xx\mdini2c.c: 'nID': unreferenced local variable
+C51 COMPILER V9.60.7.0   MDINI2C                                                           12/22/2023 18:00:42 PAGE 10  
+
+ 521          
+ 522          /*  FILE_END_HERE */
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2183    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----     154
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      2    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  2 WARNING(S),  0 ERROR(S)

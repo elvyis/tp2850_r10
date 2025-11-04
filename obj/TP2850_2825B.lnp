@@ -1,0 +1,18 @@
+".\obj\I2c.obj",
+".\obj\Main.obj",
+".\obj\Printf.obj",
+".\obj\mdin3xx.obj",
+".\obj\mdincoef.obj",
+".\obj\mdindly.obj",
+".\obj\mdinfrmt.obj",
+".\obj\mdinhtx.obj",
+".\obj\mdini2c.obj",
+".\obj\mdinipc.obj",
+".\obj\app340.obj",
+".\obj\mdinaux.obj",
+".\obj\crc16.obj",
+".\obj\TP2825B.obj" 
+TO ".\obj\TP2850_2825B" 
+PRINT(".\lst\TP2850_2825B.m51") RAMSIZE(256) 
+CODE( 0X0000-0XEFFF )
+XDATA( 0X0000-0X03FF )

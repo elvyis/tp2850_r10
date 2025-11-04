@@ -1,0 +1,87 @@
+<html>
+<body>
+<pre>
+<h1>µVision Build Log</h1>
+<h2>Tool Versions:</h2>
+IDE-Version: ¦ÌVision V5.38.0.0
+Copyright (C) 2022 ARM Ltd and ARM Germany GmbH. All rights reserved.
+License Information: zhang Kevin, tt, LIC=CZVNB-2ICQ2-5GI7V-PFYQS-IKFD4-0VBSU
+ 
+Tool Versions:
+Toolchain:       PK51 Prof. Developers Kit  Version: 9.60.7.0
+Toolchain Path:  C:\Keil_v5\C51\BIN
+C Compiler:      C51.exe V9.60.7.0
+Assembler:       A51.exe V8.2.7.0
+Linker/Locator:  BL51.exe V6.22.4.0
+Library Manager: LIB51.exe V4.30.1.0
+Hex Converter:   OH51.exe V2.7.0.0
+CPU DLL:         S8051.DLL V3.125.1.0
+Dialog DLL:      DP51.DLL V2.69.0.0
+Target DLL:      MON51.DLL V2.47.1.0
+Dialog DLL:      
+ 
+<h2>Project:</h2>
+C:\WORK\TP2850\Firmware\TP2850_R10_20220223\TP2850_R10\TP2850_MCU.uvproj
+Project File Date:  06/19/2023
+
+<h2>Output:</h2>
+Rebuild target 'Target 1'
+compiling I2c.c...
+compiling Main.c...
+src\Main.c(460): warning C280: 'addr': unreferenced local variable
+src\Main.c(541): warning C280: 'PTZ_cmd': unreferenced local variable
+src\Main.c(544): warning C280: 'PD_cmd': unreferenced local variable
+src\Main.c(1085): warning C280: 'status': unreferenced local variable
+src\Main.c(1085): warning C280: 'i': unreferenced local variable
+compiling Printf.c...
+compiling mdin3xx.c...
+src\MDIN3xx\mdin3xx.c(566): warning C280: 'pINFO': unreferenced local variable
+compiling mdincoef.c...
+compiling mdindly.c...
+compiling mdinfrmt.c...
+compiling mdinhtx.c...
+src\MDIN3xx\mdinhtx.c(2357): warning C280: 'pCTL': unreferenced local variable
+src\MDIN3xx\mdinhtx.c(2375): warning C280: 'pCTL': unreferenced local variable
+src\MDIN3xx\mdinhtx.c(2407): warning C280: 'pCTL': unreferenced local variable
+compiling mdini2c.c...
+src\MDIN3xx\mdini2c.c(384): warning C280: 'nID': unreferenced local variable
+src\MDIN3xx\mdini2c.c(453): warning C280: 'nID': unreferenced local variable
+compiling mdinipc.c...
+compiling app340.c...
+compiling mdinaux.c...
+compiling crc16.c...
+compiling TP2825B.c...
+src\TP2825B.c(1586): warning C280: 'buf': unreferenced local variable
+linking...
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_WRITEI2C16?I2C
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_READI2C16?I2C
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?TIMER_INIT?MAIN
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?UART0_INIT?MAIN
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_MDIN3XX_SETSCALEPROCESS?MDIN3XX
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_MDIN3XX_SETOUTTESTPATTERN?MDIN3XX
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_CRC16_CCITT?CRC16
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?TP2860_SYSCLK_A720P?TP2825B
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_BURSTTX?TP2825B
+Program Size: data=21.0 xdata=791 code=61435
+creating hex file from ".\obj\TP2850_2825B"...
+User command #1: hex2bin obj/tp2850_2825B.bin obj/tp2850_2825B.hex
+hex2bin v1.0, Copyright (C) 2009 uFine Logic & Chips
+Lowest address  = 00000000
+Highest address = 0000EFFB
+Pad Byte        = 0
+8-bit Checksum = 87
+Total : 61435 BYTE 
+".\obj\TP2850_2825B" - 0 Error(s), 21 Warning(s).
+Build Time Elapsed:  00:00:06
+</pre>
+</body>
+</html>

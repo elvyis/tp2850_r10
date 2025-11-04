@@ -1,0 +1,1090 @@
+C51 COMPILER V9.60.7.0   MDINFRMT                                                          12/22/2023 18:00:42 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MDINFRMT
+OBJECT MODULE PLACED IN .\obj\mdinfrmt.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE src\MDIN3xx\mdinfrmt.c LARGE OPTIMIZE(9,SIZE) BROWSE DEBUG OBJECTEXTEND 
+                    -PRINT(.\lst\mdinfrmt.lst) TABS(2) OBJECT(.\obj\mdinfrmt.obj)
+
+line level    source
+
+   1          //--------------------------------------------------------------------------------------------------------
+             ---------------
+   2          // (C) Copyright 2008  Macro Image Technology Co., LTd. , All rights reserved
+   3          // 
+   4          // This source code is the property of Macro Image Technology and is provided
+   5          // pursuant to a Software License Agreement. This code's reuse and distribution
+   6          // without Macro Image Technology's permission is strictly limited by the confidential
+   7          // information provisions of the Software License Agreement.
+   8          //--------------------------------------------------------------------------------------------------------
+             ----------------
+   9          //
+  10          // File Name      :  MDINFRMT.C
+  11          // Description    :  This file contains typedefine for the driver files 
+  12          // Ref. Docment   : 
+  13          // Revision History   :
+  14          
+  15          // -----------------------------------------------------------------------------
+  16          // Include files
+  17          // -----------------------------------------------------------------------------
+  18          #include  "mdin3xx.h"
+  19          
+  20          // -----------------------------------------------------------------------------
+  21          // Struct/Union Types and define
+  22          // -----------------------------------------------------------------------------
+  23          
+  24          // ----------------------------------------------------------------------
+  25          // Static Global Data section variables
+  26          // ----------------------------------------------------------------------
+  27          // OUT sync control
+  28          ROMDATA MDIN_OUTVIDEO_SYNC defMDINOutSync[]   = {
+  29          // TV
+  30            { // 720x480i60
+  31                20,   // hdpulse_pos
+  32                 8,   // vdpulse_pos
+  33               270, // vdpulse_pos_bot
+  34               858, // htotal_size
+  35                87,   // hactive_start
+  36               807, // hactive_end
+  37                63,   // hsync_start
+  38                 1,   // hsync_end
+  39               525, // vtotal_size
+  40                21,   // vactive_start
+  41               261, // vactive_end
+  42                 6,   // vsync_start
+  43                 3,   // vsync_end
+  44               284, // vactive_start_bot
+  45               524, // vactive_end_bot
+  46               268, // vsync_start_bot
+  47               265, // vsync_end_bot
+  48               430, // vsync_bot_fld_pos
+  49            
+  50                 4,   // pre_div_vclk (P)
+  51                16,   // post_div_vclk (M)
+  52                 8,   // post_scale_vclk (S)
+C51 COMPILER V9.60.7.0   MDINFRMT                                                          12/22/2023 18:00:42 PAGE 2   
+
+  53          
+  54            #if defined(SYSTEM_USE_MCLK189)
+                    27,   // axclk_gen_div_s (S)
+                     1,   // axclk_gen_div_f (F)
+                     1    // axclk_gen_div_t (T)
+                #else
+  59                29,   // axclk_gen_div_s (S)
+  60                 1,   // axclk_gen_div_f (F)
+  61                 1    // axclk_gen_div_t (T)
+  62            #endif
+  63            },
+  64            { // 720x576i50
+  65                20,   // hdpulse_pos
+  66                 8,   // vdpulse_pos
+  67               320,   // vdpulse_pos_bot
+  68               864,   // htotal_size
+  69               100,   // hactive_start
+  70               820,   // hactive_end
+  71                64,   // hsync_start
+  72                 1,   // hsync_end
+  73               625,   // vtotal_size
+  74                23,   // vactive_start
+  75               311,   // vactive_end
+  76                 4,   // vsync_start
+  77                 1,   // vsync_end
+  78               336,   // vactive_start_bot
+  79               624,   // vactive_end_bot
+  80               316,   // vsync_start_bot
+  81               313,   // vsync_end_bot
+  82               433,   // vsync_bot_fld_pos
+  83            
+  84                 4,   // pre_div_vclk (P)
+  85                16,   // post_div_vclk (M)
+  86                 8,   // post_scale_vclk (S)
+  87          
+  88            #if defined(SYSTEM_USE_MCLK189)
+                    27,   // axclk_gen_div_s (S)
+                     1,   // axclk_gen_div_f (F)
+                     1    // axclk_gen_div_t (T)
+                #else
+  93                29,   // axclk_gen_div_s (S)
+  94                 1,   // axclk_gen_div_f (F)
+  95                 1    // axclk_gen_div_t (T)
+  96            #endif
+  97            },
+  98            { // 720x480p60
+  99                20,   // hdpulse_pos
+ 100                10,   // vdpulse_pos
+ 101                 0,   // vdpulse_pos_bot
+ 102               858,   // htotal_size
+ 103                90,   // hactive_start
+ 104               810,   // hactive_end
+ 105                63,   // hsync_start
+ 106                 1,   // hsync_end
+ 107               525,   // vtotal_size
+ 108                43,   // vactive_start
+ 109               523,   // vactive_end
+ 110                13,   // vsync_start
+ 111                 7,   // vsync_end
+ 112                 0,   // vactive_start_bot
+ 113                 0,   // vactive_end_bot
+ 114                 0,   // vsync_start_bot
+C51 COMPILER V9.60.7.0   MDINFRMT                                                          12/22/2023 18:00:42 PAGE 3   
+
+ 115                 0,   // vsync_end_bot
+ 116                 0,   // vsync_bot_fld_pos
+ 117            
+ 118                 4,   // pre_div_vclk (P)
+ 119                16,   // post_div_vclk (M)
+ 120                 4,   // post_scale_vclk (S)
+ 121          
+ 122            #if defined(SYSTEM_USE_MCLK189)
+                    13,   // axclk_gen_div_s (S)
+                     1,   // axclk_gen_div_f (F)
+                     1    // axclk_gen_div_t (T)
+                #else
+ 127                14,   // axclk_gen_div_s (S)
+ 128                 1,   // axclk_gen_div_f (F)
+ 129                 1    // axclk_gen_div_t (T)
+ 130            #endif
+ 131            },
+ 132            { // 720x576p50
+ 133                20,   // hdpulse_pos
+ 134                10,   // vdpulse_pos
+ 135                 0,   // vdpulse_pos_bot
+ 136               864,   // htotal_size
+ 137               100,   // hactive_start
+ 138               820,   // hactive_end
+ 139                65,   // hsync_start
+ 140                 1,   // hsync_end
+ 141               625,   // vtotal_size
+ 142                45,   // vactive_start
+ 143               621,   // vactive_end
+ 144                 6,   // vsync_start
+ 145                 1,   // vsync_end
+ 146                 0,   // vactive_start_bot
+ 147                 0,   // vactive_end_bot
+ 148                 0,   // vsync_start_bot
+ 149                 0,   // vsync_end_bot
+ 150                 0,   // vsync_bot_fld_pos
+ 151            
+ 152                 4,   // pre_div_vclk (P)
+ 153                16,   // post_div_vclk (M)
+ 154                 4,   // post_scale_vclk (S)
+ 155          
+ 156            #if defined(SYSTEM_USE_MCLK189)
+                    13,   // axclk_gen_div_s (S)
+                     1,   // axclk_gen_div_f (F)
+                     1    // axclk_gen_div_t (T)
+                #else
+ 161                14,   // axclk_gen_div_s (S)
+ 162                 1,   // axclk_gen_div_f (F)
+ 163                 1    // axclk_gen_div_t (T)
+ 164            #endif
+ 165            },
+ 166            { // 1280x720p60
+ 167                20,   // hdpulse_pos
+ 168                10,   // vdpulse_pos
+ 169                 0,   // vdpulse_pos_bot
+ 170              1650,   // htotal_size
+ 171               228,   // hactive_start
+ 172              1508,   // hactive_end
+ 173                41,   // hsync_start
+ 174                 1,   // hsync_end
+ 175               750,   // vtotal_size
+ 176                26,   // vactive_start
+C51 COMPILER V9.60.7.0   MDINFRMT                                                          12/22/2023 18:00:42 PAGE 4   
+
+ 177               746,   // vactive_end
+ 178                 6,   // vsync_start
+ 179                 1,   // vsync_end
+ 180                 0,   // vactive_start_bot
+ 181                 0,   // vactive_end_bot
+ 182                 0,   // vsync_start_bot
+ 183                 0,   // vsync_end_bot
+ 184                 0,   // vsync_bot_fld_pos
+ 185            
+ 186                 4,   // pre_div_vclk (P)
+ 187                22,   // post_div_vclk (M)
+ 188                 2,   // post_scale_vclk (S)
+ 189          
+ 190            #if defined(SYSTEM_USE_MCLK189)
+                     5,   // axclk_gen_div_s (S)
+                     1,   // axclk_gen_div_f (F)
+                    11    // axclk_gen_div_t (T)
+                #else
+ 195                 5,   // axclk_gen_div_s (S)
+ 196                 5,   // axclk_gen_div_f (F)
+ 197                11    // axclk_gen_div_t (T)
+ 198            #endif
+ 199            },
+ 200            { // 1280x720p59.94
+ 201                20,   // hdpulse_pos
+ 202                10,   // vdpulse_pos
+ 203                 0,   // vdpulse_pos_bot
+ 204              1650,   // htotal_size
+ 205               228,   // hactive_start
+ 206              1508,   // hactive_end
+ 207                41,   // hsync_start
+ 208                 1,   // hsync_end
+ 209               750,   // vtotal_size
+ 210                26,   // vactive_start
+ 211               746,   // vactive_end
+ 212                 6,   // vsync_start
+ 213                 1,   // vsync_end
+ 214                 0,   // vactive_start_bot
+ 215                 0,   // vactive_end_bot
+ 216                 0,   // vsync_start_bot
+ 217                 0,   // vsync_end_bot
+ 218                 0,   // vsync_bot_fld_pos
+ 219            
+ 220                91,   // pre_div_vclk (P)
+ 221              250,    // post_div_vclk (M)
+ 222                 1,   // post_scale_vclk (S)
+ 223          
+ 224            #if defined(SYSTEM_USE_MCLK189)
+                     5,   // axclk_gen_div_s (S)
+                     5,   // axclk_gen_div_f (F)
+                    52    // axclk_gen_div_t (T)
+                #else
+ 229                 5,   // axclk_gen_div_s (S)
+ 230                23,   // axclk_gen_div_f (F)
+ 231                50    // axclk_gen_div_t (T)
+ 232            #endif
+ 233            },
+ 234            { // 1280x720p50
+ 235                20,   // hdpulse_pos
+ 236                10,   // vdpulse_pos
+ 237                 0,   // vdpulse_pos_bot
+ 238              1980,   // htotal_size
+C51 COMPILER V9.60.7.0   MDINFRMT                                                          12/22/2023 18:00:42 PAGE 5   
+
+ 239               228,   // hactive_start
+ 240              1508,   // hactive_end
+ 241                41,   // hsync_start
+ 242                 1,   // hsync_end
+ 243               750,   // vtotal_size
+ 244                26,   // vactive_start
+ 245               746,   // vactive_end
+ 246                 6,   // vsync_start
+ 247                 1,   // vsync_end
+ 248                 0,   // vactive_start_bot
+ 249                 0,   // vactive_end_bot
+ 250                 0,   // vsync_start_bot
+ 251                 0,   // vsync_end_bot
+ 252                 0,   // vsync_bot_fld_pos
+ 253            
+ 254                 4,   // pre_div_vclk (P)
+ 255                22,   // post_div_vclk (M)
+ 256                 2,   // post_scale_vclk (S)
+ 257          
+ 258            #if defined(SYSTEM_USE_MCLK189)
+                     5,   // axclk_gen_div_s (S)
+                     1,   // axclk_gen_div_f (F)
+                    11    // axclk_gen_div_t (T)
+                #else
+ 263                 5,   // axclk_gen_div_s (S)
+ 264                 5,   // axclk_gen_div_f (F)
+ 265                11    // axclk_gen_div_t (T)
+ 266            #endif
+ 267            },
+ 268            { // 1280x720p30
+ 269                20,   // hdpulse_pos
+ 270                10,   // vdpulse_pos
+ 271                 0,   // vdpulse_pos_bot
+ 272              3300,   // htotal_size
+ 273               228,   // hactive_start
+ 274              1508,   // hactive_end
+ 275                41,   // hsync_start
+ 276                 1,   // hsync_end
+ 277               750,   // vtotal_size
+ 278                26,   // vactive_start
+ 279               746,   // vactive_end
+ 280                 6,   // vsync_start
+ 281                 1,   // vsync_end
+ 282                 0,   // vactive_start_bot
+ 283                 0,   // vactive_end_bot
+ 284                 0,   // vsync_start_bot
+ 285                 0,   // vsync_end_bot
+ 286                 0,   // vsync_bot_fld_pos
+ 287            
+ 288                 4,   // pre_div_vclk (P)
+ 289                22,   // post_div_vclk (M)
+ 290                 2,   // post_scale_vclk (S)
+ 291          
+ 292            #if defined(SYSTEM_USE_MCLK189)
+                     5,   // axclk_gen_div_s (S)
+                     1,   // axclk_gen_div_f (F)
+                    11    // axclk_gen_div_t (T)
+                #else
+ 297                 5,   // axclk_gen_div_s (S)
+ 298                 5,   // axclk_gen_div_f (F)
+ 299                11    // axclk_gen_div_t (T)
+ 300            #endif
+C51 COMPILER V9.60.7.0   MDINFRMT                                                          12/22/2023 18:00:42 PAGE 6   
+
+ 301            },
+ 302            { // 1280x720p25
+ 303                20,   // hdpulse_pos
+ 304                10,   // vdpulse_pos
+ 305                 0,   // vdpulse_pos_bot
+ 306              3960,   // htotal_size
+ 307               228,   // hactive_start
+ 308              1508,   // hactive_end
+ 309                41,   // hsync_start
+ 310                 1,   // hsync_end
+ 311               750,   // vtotal_size
+ 312                26,   // vactive_start
+ 313               746,   // vactive_end
+ 314                 6,   // vsync_start
+ 315                 1,   // vsync_end
+ 316                 0,   // vactive_start_bot
+ 317                 0,   // vactive_end_bot
+ 318                 0,   // vsync_start_bot
+ 319                 0,   // vsync_end_bot
+ 320                 0,   // vsync_bot_fld_pos
+ 321            
+ 322                 4,   // pre_div_vclk (P)
+ 323                22,   // post_div_vclk (M)
+ 324                 2,   // post_scale_vclk (S)
+ 325          
+ 326            #if defined(SYSTEM_USE_MCLK189)
+                     5,   // axclk_gen_div_s (S)
+                     1,   // axclk_gen_div_f (F)
+                    11    // axclk_gen_div_t (T)
+                #else
+ 331                 5,   // axclk_gen_div_s (S)
+ 332                 5,   // axclk_gen_div_f (F)
+ 333                11    // axclk_gen_div_t (T)
+ 334            #endif
+ 335            },
+ 336            { // 1280x720p24
+ 337                20,   // hdpulse_pos
+ 338                10,   // vdpulse_pos
+ 339                 0,   // vdpulse_pos_bot
+ 340              3300, // htotal_size
+ 341               228,   // hactive_start
+ 342              1508,   // hactive_end
+ 343                41,   // hsync_start
+ 344                 1,   // hsync_end
+ 345               750,   // vtotal_size
+ 346                26,   // vactive_start
+ 347               746,   // vactive_end
+ 348                 6,   // vsync_start
+ 349                 1,   // vsync_end
+ 350                 0,   // vactive_start_bot
+ 351                 0,   // vactive_end_bot
+ 352                 0,   // vsync_start_bot
+ 353                 0,   // vsync_end_bot
+ 354                 0,   // vsync_bot_fld_pos
+ 355            
+ 356                 6,   // pre_div_vclk (P)
+ 357                66,   // post_div_vclk (M)
+ 358                 5,   // post_scale_vclk (S)
+ 359          
+ 360            #if defined(SYSTEM_USE_MCLK189)
+                     6,   // axclk_gen_div_s (S)
+                     4,   // axclk_gen_div_f (F)
+C51 COMPILER V9.60.7.0   MDINFRMT                                                          12/22/2023 18:00:42 PAGE 7   
+
+                    11    // axclk_gen_div_t (T)
+                #else
+ 365                 6,   // axclk_gen_div_s (S)
+ 366                 9,   // axclk_gen_div_f (F)
+ 367                11    // axclk_gen_div_t (T)
+ 368            #endif
+ 369            },
+ 370            { // 1920x1080i60
+ 371                20,   // hdpulse_pos
+ 372                 1,   // vdpulse_pos
+ 373               564,   // vdpulse_pos_bot
+ 374              2200,   // htotal_size
+ 375               160,   // hactive_start
+ 376              2080,   // hactive_end
+ 377                45,   // hsync_start
+ 378                 1,   // hsync_end
+ 379              1125,   // vtotal_size
+ 380                21,   // vactive_start
+ 381               561,   // vactive_end
+ 382                 6,   // vsync_start
+ 383                 1,   // vsync_end
+ 384               584,   // vactive_start_bot
+ 385              1124,   // vactive_end_bot
+ 386               568,   // vsync_start_bot
+ 387               563,   // vsync_end_bot
+ 388              1101,   // vsync_bot_fld_pos
+ 389            
+ 390                 4,   // pre_div_vclk (P)
+ 391                22,   // post_div_vclk (M)
+ 392                 2,   // post_scale_vclk (S)
+ 393          
+ 394            #if defined(SYSTEM_USE_MCLK189)
+                     5,   // axclk_gen_div_s (S)
+                     1,   // axclk_gen_div_f (F)
+                    11    // axclk_gen_div_t (T)
+                #else
+ 399                 5,   // axclk_gen_div_s (S)
+ 400                 5,   // axclk_gen_div_f (F)
+ 401                11    // axclk_gen_div_t (T)
+ 402            #endif
+ 403            },
+ 404            { // 1920x1080i59.94
+ 405                20,   // hdpulse_pos
+ 406                 1,   // vdpulse_pos
+ 407               564,   // vdpulse_pos_bot
+ 408              2200,   // htotal_size
+ 409               160,   // hactive_start
+ 410              2080,   // hactive_end
+ 411                45,   // hsync_start
+ 412                 1,   // hsync_end
+ 413              1125,   // vtotal_size
+ 414                21,   // vactive_start
+ 415               561,   // vactive_end
+ 416                 6,   // vsync_start
+ 417                 1,   // vsync_end
+ 418               584,   // vactive_start_bot
+ 419              1124,   // vactive_end_bot
+ 420               568,   // vsync_start_bot
+ 421               563,   // vsync_end_bot
+ 422              1101,   // vsync_bot_fld_pos
+ 423            
+ 424                 91,    // pre_div_vclk (P)
+C51 COMPILER V9.60.7.0   MDINFRMT                                                          12/22/2023 18:00:42 PAGE 8   
+
+ 425                250,    // post_div_vclk (M)
+ 426                 1,   // post_scale_vclk (S)
+ 427          
+ 428            #if defined(SYSTEM_USE_MCLK189)
+                     5,   // axclk_gen_div_s (S)
+                     5,   // axclk_gen_div_f (F)
+                    52    // axclk_gen_div_t (T)
+                #else
+ 433                 5,   // axclk_gen_div_s (S)
+ 434                23,   // axclk_gen_div_f (F)
+ 435                50    // axclk_gen_div_t (T)
+ 436            #endif
+ 437            },
+ 438            { // 1920x1080i50
+ 439                20,   // hdpulse_pos
+ 440                 1,   // vdpulse_pos
+ 441               564,   // vdpulse_pos_bot
+ 442              2640,   // htotal_size
+ 443               160,   // hactive_start
+ 444              2080,   // hactive_end
+ 445                45,   // hsync_start
+ 446                 1,   // hsync_end
+ 447              1125,   // vtotal_size
+ 448                22,   // vactive_start
+ 449               562,   // vactive_end
+ 450                 6,   // vsync_start
+ 451                 1,   // vsync_end
+ 452               585,   // vactive_start_bot
+ 453                 0,   // vactive_end_bot
+ 454               568,   // vsync_start_bot
+ 455               563,   // vsync_end_bot
+ 456              1321,   // vsync_bot_fld_pos
+ 457            
+ 458                 4,   // pre_div_vclk (P)
+ 459                22,   // post_div_vclk (M)
+ 460                 2,   // post_scale_vclk (S)
+ 461          
+ 462            #if defined(SYSTEM_USE_MCLK189)
+                     5,   // axclk_gen_div_s (S)
+                     1,   // axclk_gen_div_f (F)
+                    11    // axclk_gen_div_t (T)
+                #else
+ 467                 5,   // axclk_gen_div_s (S)
+ 468                 5,   // axclk_gen_div_f (F)
+ 469                11    // axclk_gen_div_t (T)
+ 470            #endif
+ 471            },
+ 472            { // 1920x1080p60
+ 473                20,   // hdpulse_pos
+ 474                10,   // vdpulse_pos
+ 475                 0,   // vdpulse_pos_bot
+ 476              2200,   // htotal_size
+ 477               160,   // hactive_start
+ 478              2080,   // hactive_end
+ 479                45,   // hsync_start
+ 480                 1,   // hsync_end
+ 481              1125,   // vtotal_size
+ 482                42,   // vactive_start
+ 483              1122,   // vactive_end
+ 484                 6,   // vsync_start
+ 485                 1,   // vsync_end
+ 486                 0,   // vactive_start_bot
+C51 COMPILER V9.60.7.0   MDINFRMT                                                          12/22/2023 18:00:42 PAGE 9   
+
+ 487                 0,   // vactive_end_bot
+ 488                 0,   // vsync_start_bot
+ 489                 0,   // vsync_end_bot
+ 490                 0,   // vsync_bot_fld_pos
+ 491            
+ 492                 4,   // pre_div_vclk (P)
+ 493                22,   // post_div_vclk (M)
+ 494                 1,   // post_scale_vclk (S)
+ 495          
+ 496            #if defined(SYSTEM_USE_MCLK189)
+                     2,   // axclk_gen_div_s (S)
+                     6,   // axclk_gen_div_f (F)
+                    11    // axclk_gen_div_t (T)
+                #else
+ 501                 2,   // axclk_gen_div_s (S)
+ 502                 8,   // axclk_gen_div_f (F)
+ 503                11    // axclk_gen_div_t (T)
+ 504            #endif
+ 505            },
+ 506            { // 1920x1080p59.94
+ 507                20,   // hdpulse_pos
+ 508                10,   // vdpulse_pos
+ 509                 0,   // vdpulse_pos_bot
+ 510              2200,   // htotal_size
+ 511               160,   // hactive_start
+ 512              2080,   // hactive_end
+ 513                45,   // hsync_start
+ 514                 1,   // hsync_end
+ 515              1125,   // vtotal_size
+ 516                42,   // vactive_start
+ 517              1122,   // vactive_end
+ 518                 6,   // vsync_start
+ 519                 1,   // vsync_end
+ 520                 0,   // vactive_start_bot
+ 521                 0,   // vactive_end_bot
+ 522                 0,   // vsync_start_bot
+ 523                 0,   // vsync_end_bot
+ 524                 0,   // vsync_bot_fld_pos
+ 525            
+ 526                 91,    // pre_div_vclk (P)
+ 527                500,    // post_div_vclk (M)
+ 528                 1,   // post_scale_vclk (S)
+ 529          
+ 530            #if defined(SYSTEM_USE_MCLK189)
+                     2,   // axclk_gen_div_s (S)
+                    40,   // axclk_gen_div_f (F)
+                    73    // axclk_gen_div_t (T)
+                #else
+ 535                 2,   // axclk_gen_div_s (S)
+ 536                46,   // axclk_gen_div_f (F)
+ 537                63    // axclk_gen_div_t (T)
+ 538            #endif
+ 539            },
+ 540            { // 1920x1080p50
+ 541                20,   // hdpulse_pos
+ 542                10,   // vdpulse_pos
+ 543                 0,   // vdpulse_pos_bot
+ 544              2640,   // htotal_size
+ 545               160,   // hactive_start
+ 546              2080,   // hactive_end
+ 547                45,   // hsync_start
+ 548                 1,   // hsync_end
+C51 COMPILER V9.60.7.0   MDINFRMT                                                          12/22/2023 18:00:42 PAGE 10  
+
+ 549              1125,   // vtotal_size
+ 550                42,   // vactive_start
+ 551              1122,   // vactive_end
+ 552                 6,   // vsync_start
+ 553                 1,   // vsync_end
+ 554                 0,   // vactive_start_bot
+ 555                 0,   // vactive_end_bot
+ 556                 0,   // vsync_start_bot
+ 557                 0,   // vsync_end_bot
+ 558                 0,   // vsync_bot_fld_pos
+ 559            
+ 560                 4,   // pre_div_vclk (P)
+ 561                22,   // post_div_vclk (M)
+ 562                 1,   // post_scale_vclk (S)
+ 563          
+ 564            #if defined(SYSTEM_USE_MCLK189)
+                     2,   // axclk_gen_div_s (S)
+                     6,   // axclk_gen_div_f (F)
+                    11    // axclk_gen_div_t (T)
+                #else
+ 569                 2,   // axclk_gen_div_s (S)
+ 570                 8,   // axclk_gen_div_f (F)
+ 571                11    // axclk_gen_div_t (T)
+ 572            #endif
+ 573            },
+ 574            { // 1920x1080p30
+ 575                20,   // hdpulse_pos
+ 576                10,   // vdpulse_pos
+ 577                 0,   // vdpulse_pos_bot
+ 578              2200,   // htotal_size
+ 579               160,   // hactive_start
+ 580              2080,   // hactive_end
+ 581                45,   // hsync_start
+ 582                 1,   // hsync_end
+ 583              1125,   // vtotal_size
+ 584                42,   // vactive_start
+ 585              1122,   // vactive_end
+ 586                 6,   // vsync_start
+ 587                 1,   // vsync_end
+ 588                 0,   // vactive_start_bot
+ 589                 0,   // vactive_end_bot
+ 590                 0,   // vsync_start_bot
+ 591                 0,   // vsync_end_bot
+ 592                 0,   // vsync_bot_fld_pos
+ 593            
+ 594                 4,   // pre_div_vclk (P)
+ 595                22,   // post_div_vclk (M)
+ 596                 2,   // post_scale_vclk (S)
+ 597          
+ 598            #if defined(SYSTEM_USE_MCLK189)
+                     5,   // axclk_gen_div_s (S)
+                     1,   // axclk_gen_div_f (F)
+                    11    // axclk_gen_div_t (T)
+                #else
+ 603                 5,   // axclk_gen_div_s (S)
+ 604                 5,   // axclk_gen_div_f (F)
+ 605                11    // axclk_gen_div_t (T)
+ 606            #endif
+ 607            },
+ 608            { // 1920x1080p25
+ 609                20,   // hdpulse_pos
+ 610                10,   // vdpulse_pos
+C51 COMPILER V9.60.7.0   MDINFRMT                                                          12/22/2023 18:00:42 PAGE 11  
+
+ 611                 0,   // vdpulse_pos_bot
+ 612              2640,   // htotal_size
+ 613               160,   // hactive_start
+ 614              2080,   // hactive_end
+ 615                45,   // hsync_start
+ 616                 1,   // hsync_end
+ 617              1125,   // vtotal_size
+ 618                42,   // vactive_start
+ 619              1122,   // vactive_end
+ 620                 6,   // vsync_start
+ 621                 1,   // vsync_end
+ 622                 0,   // vactive_start_bot
+ 623                 0,   // vactive_end_bot
+ 624                 0,   // vsync_start_bot
+ 625                 0,   // vsync_end_bot
+ 626                 0,   // vsync_bot_fld_pos
+ 627            
+ 628                 4,   // pre_div_vclk (P)
+ 629                22,   // post_div_vclk (M)
+ 630                 2,   // post_scale_vclk (S)
+ 631          
+ 632            #if defined(SYSTEM_USE_MCLK189)
+                     5,   // axclk_gen_div_s (S)
+                     1,   // axclk_gen_div_f (F)
+                    11    // axclk_gen_div_t (T)
+                #else
+ 637                 5,   // axclk_gen_div_s (S)
+ 638                 5,   // axclk_gen_div_f (F)
+ 639                11    // axclk_gen_div_t (T)
+ 640            #endif
+ 641            },
+ 642          
+ 643            { // 1920x1080p24
+ 644                20,   // hdpulse_pos
+ 645                10,   // vdpulse_pos
+ 646                 0,   // vdpulse_pos_bot
+ 647              2750,   // htotal_size
+ 648               160,   // hactive_start
+ 649              2080,   // hactive_end
+ 650                45,   // hsync_start
+ 651                 1,   // hsync_end
+ 652              1125,   // vtotal_size
+ 653                42,   // vactive_start
+ 654              1122,   // vactive_end
+ 655                 6,   // vsync_start
+ 656                 1,   // vsync_end
+ 657                 0,   // vactive_start_bot
+ 658                 0,   // vactive_end_bot
+ 659                 0,   // vsync_start_bot
+ 660                 0,   // vsync_end_bot
+ 661                 0,   // vsync_bot_fld_pos
+ 662            
+ 663                 4,   // pre_div_vclk (P)
+ 664                22,   // post_div_vclk (M)
+ 665                 2,   // post_scale_vclk (S)
+ 666          
+ 667            #if defined(SYSTEM_USE_MCLK189)
+                     5,   // axclk_gen_div_s (S)
+                     1,   // axclk_gen_div_f (F)
+                    11    // axclk_gen_div_t (T)
+                #else
+ 672                 5,   // axclk_gen_div_s (S)
+C51 COMPILER V9.60.7.0   MDINFRMT                                                          12/22/2023 18:00:42 PAGE 12  
+
+ 673                 5,   // axclk_gen_div_f (F)
+ 674                11    // axclk_gen_div_t (T)
+ 675            #endif
+ 676            },
+ 677            { // 1280x960p60
+ 678                20,   // hdpulse_pos
+ 679                10,   // vdpulse_pos
+ 680                 0,   // vdpulse_pos_bot
+ 681              2200,   // htotal_size
+ 682               160,   // hactive_start
+ 683              2080-640,   // hactive_end
+ 684                45,   // hsync_start
+ 685                 1,   // hsync_end
+ 686              1125,   // vtotal_size
+ 687                42+120,   // vactive_start
+ 688              1122,   // vactive_end
+ 689                 6,   // vsync_start
+ 690                 1,   // vsync_end
+ 691                 0,   // vactive_start_bot
+ 692                 0,   // vactive_end_bot
+ 693                 0,   // vsync_start_bot
+ 694                 0,   // vsync_end_bot
+ 695                 0,   // vsync_bot_fld_pos
+ 696            
+ 697                 4,   // pre_div_vclk (P)
+ 698                22,   // post_div_vclk (M)
+ 699                 1,   // post_scale_vclk (S)
+ 700          
+ 701            #if defined(SYSTEM_USE_MCLK189)
+                     2,   // axclk_gen_div_s (S)
+                     6,   // axclk_gen_div_f (F)
+                    11    // axclk_gen_div_t (T)
+                #else
+ 706                 2,   // axclk_gen_div_s (S)
+ 707                 8,   // axclk_gen_div_f (F)
+ 708                11    // axclk_gen_div_t (T)
+ 709            #endif
+ 710            },
+ 711          };
+ 712          
+ 713          
+ 714            
+ 715          // default value for srcVideo format
+ 716          ROMDATA MDIN_SRCVIDEO_ATTB defMDINSrcVideo[]    = {
+ 717          //   Htot                            H/V Polarity & ScanType                                       Hact  Vact
+ 718          #if defined(IN_960H_MODE) // input 960H mode, modified on 29Feb2012
+                //{858, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_INTR,
+             -  720,  480},  // 960x480i60
+                //{1200, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_INTR
+             -,  960,  576},  // 960x576i50
+                {2360, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_INTR, 
+             - 960,  480},  // 960x480i60
+                {2376, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_INTR, 
+             - 960,  576},  // 960x576i50
+              #else
+ 724            { 858, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_INTR, 
+             - 720,  480},  // 720x480i60
+ 725            { 864, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_INTR, 
+             - 720,  576},  // 720x576i50
+ 726          #endif  
+ 727            { 858, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             - 720,  480},    // 720x480p60
+C51 COMPILER V9.60.7.0   MDINFRMT                                                          12/22/2023 18:00:42 PAGE 13  
+
+ 728            { 864, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             - 720,  576},    // 720x576p50
+ 729            {1650, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1280,  720},    // 1280x720p60
+ 730            {1980, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1280,  720},    // 1280x720p50
+ 731            {2200, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_INTR, 
+             -1920, 1080},    // 1920x1080i60
+ 732            {2640, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_INTR, 
+             -1920, 1080},    // 1920x1080i50
+ 733            {2200, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1920, 1080},  // 1920x1080p60
+ 734            {2640, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1920, 1080},  // 1920x1080p50
+ 735          //  {1100, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG
+             -, 960, 1080},  // 1920x1080p60
+ 736            {1650, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1280, 960},  // 1280x960p30
+ 737            {1650, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1280, 320},  // 1280x320p60 
+ 738          
+ 739            { 800, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             - 640,  480},  // 640x480p60
+ 740            {1056, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             - 800,  600},  // 800x600p60
+ 741            {1344, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1024,  768},  // 1024x768p60
+ 742            {1688, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1280, 1024},  // 1280x1024p60
+ 743          
+ 744            {1664, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1280,  720},  // 1280x720pRGB
+ 745            {1800, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1280,  960},  // 1280x960p60
+ 746            {1792, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1360,  768},  // 1360x768p60
+ 747            {1904, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1440,  900},  // 1440x900p60
+ 748            {1250, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1024,  512},  // 1024x518p60
+ 749          #if VGA_SOURCE_EXTENSION == 1
+                { 832, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             - 640,  480},  // 640x480p72
+                { 840, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             - 640,  480},  // 640x480p75
+                {1024, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             - 800,  600},  // 800x600p56
+                {1040, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             - 800,  600},  // 800x600p72
+                {1056, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             - 800,  600},  // 800x600p75
+                {1328, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1024,  768},  // 1024x768p70
+                {1312, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1024,  768},  // 1024x768p75
+                {1600, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1152,  864},  // 1152x864p75
+                {1680, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1280,  800},  // 1280x800p60
+              #endif
+ 760          };
+ 761          
+C51 COMPILER V9.60.7.0   MDINFRMT                                                          12/22/2023 18:00:42 PAGE 14  
+
+ 762          // default value for outVideo format
+ 763          ROMDATA MDIN_OUTVIDEO_ATTB defMDINOutVideo[]    = {
+ 764          //   Htot                            H/V Polarity & ScanType                                       Hact  Vact
+ 765            // TV
+ 766            { 858, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_INTR, 
+             - 720,  480},    // 720x480i60
+ 767            { 864, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_INTR, 
+             - 720,  576},    // 720x576i50
+ 768          #if defined(IN_960H_MODE) // input 960H mode, modified on 29Feb2012
+                {1144, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             - 960,  480},  // 960x480p60
+                {1200, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             - 960,  576},  // 960x576p50
+              #else
+ 772            { 858, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             - 720,  480},  // 720x480p60
+ 773            { 864, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_NEGATIVE_HSYNC|MDIN_NEGATIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             - 720,  576},  // 720x576p50
+ 774          #endif  
+ 775            
+ 776            {1650, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1280,  720},    // 1280x720p60
+ 777            {1650, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1280,  720},    // 1280x720p59.94
+ 778            {1980, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1280,  720},    // 1280x720p50
+ 779            
+ 780            {3300, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1280,  720},    // 1280x720p30
+ 781            {3960, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1280,  720},    // 1280x720p25
+ 782            {3300, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1280,  720},    // 1280x720p24
+ 783            
+ 784            {2200, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_INTR, 
+             -1920, 1080},    // 1920x1080i60
+ 785            {2200, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_INTR, 
+             -1920, 1080},    // 1920x1080i59.94
+ 786            {2640, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_INTR, 
+             -1920, 1080},    // 1920x1080i50
+ 787            
+ 788            {2200, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1920, 1080},  // 1920x1080p60
+ 789            {2200, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1920, 1080},  // 1920x1080p59.94
+ 790            {2640, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1920, 1080},  // 1920x1080p50
+ 791            
+ 792            {2640, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1920, 1080},  // 1920x1080p30
+ 793            {2640, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1920, 1080},  // 1920x1080p25
+ 794            {2750, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1920, 1080},  // 1920x1080p24
+ 795          
+ 796            {2200, MDIN_POSITIVE_HACT|MDIN_POSITIVE_VACT|MDIN_POSITIVE_HSYNC|MDIN_POSITIVE_VSYNC|MDIN_SCANTYPE_PROG, 
+             -1280, 960},  // 1280x960p60
+ 797          
+ 798          };
+ 799          
+ 800          #if defined(SYSTEM_USE_MDIN340)||defined(SYSTEM_USE_MDIN380)
+ 801          // default value for hdmi-Video format
+C51 COMPILER V9.60.7.0   MDINFRMT                                                          12/22/2023 18:00:42 PAGE 15  
+
+ 802          ROMDATA MDIN_HTXVIDEO_FRMT defMDINHTXVideo[]    = {
+ 803          //    MDIN-format (wide(0)-4:3, wide(1)-4:3/16:9, wide(2)-16:9)
+ 804          //    id1 id2 sub wide|rep    pixel   freq  Htot  Vtot     x    y   Hact  Vact                 BT656
+ 805          //  {{  6,  7, 0, (1<<4)|1}, { 2700,  6000, 1716,  525}, {238,  18,  720,  240}, {3, 124, 3, 114,  15,  38,
+             -  4,  429}}, // 1440x480i@60(6,7)
+ 806            {{  6,  7, 0, (1<<4)|1}, { 2700,  6000, 1716,  264}, {119,  18,  720,  240}, {3,  62, 2, 114,  15,  19,  
+             -4,  429}}, // 1440x480i@60(6,7) // 28Dec2011
+ 807          //  {{ 21, 22, 0, (0<<4)|1}, { 2700,  5000, 1728,  625}, {264,  22,  720,  288}, {3, 126, 3, 138,  19,  24,
+             -  2,  432}}, // 1440x576i@50(21,22)
+ 808            {{ 21, 22, 0, (0<<4)|1}, { 2700,  5000, 1728,  313}, {132,  22,  720,  288}, {3,  63, 3, 138,  19,  12,  
+             -2,  432}}, // 1440x576i@50(21,22) // 28Dec2011
+ 809            {{  2,  3, 0, (1<<4)|0}, { 2700,  6000,  858,  525}, {122,  36,  720,  480}, {0,  62, 6,  60,  30,  16,  
+             -9,    0}}, // 720x480p@60(2,3)
+ 810            {{ 17, 18, 0, (1<<4)|0}, { 2700,  5000,  864,  625}, {132,  44,  720,  576}, {0,  64, 5,  68,  39,  12,  
+             -5,    0}}, // 720x576p@50(17,18)
+ 811            
+ 812            {{  4,  0, 0, (2<<4)|0}, { 7425,  6000, 1650,  750}, {260,  25, 1280,  720}, {0,  40, 5, 220,  20, 110,  
+             -5,    0}}, // 1280x720p@60(4)
+ 813            {{  4,  0, 0, (2<<4)|0}, { 7418,  5994, 1650,  750}, {260,  25, 1280,  720}, {0,  40, 5, 220,  20, 110,  
+             -5,    0}}, // 1280x720p@59.94(4)
+ 814            {{ 19,  0, 0, (2<<4)|0}, { 7425,  5000, 1980,  750}, {260,  25, 1280,  720}, {0,  40, 5, 220,  20, 440,  
+             -5,    0}}, // 1280x720p@50(19)
+ 815            
+ 816            {{ 62,  0, 0, (2<<4)|0}, { 7425,  3000, 3300,  750}, {260,  25, 1280,  720}, {0,  40, 5, 220,  20, 1760, 
+             - 5,    0}}, // 1280x720p@30(62)
+ 817            {{ 61,  0, 0, (2<<4)|0}, { 7425,  2500, 3960,  750}, {260,  25, 1280,  720}, {0,  40, 5, 220,  20, 2420, 
+             - 5,    0}}, // 1280x720p@25(61)
+ 818            {{ 60,  0, 0, (2<<4)|0}, { 5940,  2400, 3300,  750}, {260,  25, 1280,  720}, {0,  40, 5, 220,  20, 1760, 
+             - 5,    0}}, // 1280x720p@24(60)
+ 819            
+ 820            {{  5,  0, 0, (2<<4)|0}, { 7418,  6000, 2200, 1125}, {192,  20, 1920,  540}, {0,  44, 5, 148,  15,  88,  
+             -2, 1100}}, // 1920x1080i@60(5)
+ 821            {{  5,  0, 0, (2<<4)|0}, { 7425,  5994, 2200, 1125}, {192,  20, 1920,  540}, {0,  44, 5, 148,  15,  88,  
+             -2, 1100}}, // 1920x1080i@59.94(5)
+ 822            {{ 20,  0, 0, (2<<4)|0}, { 7425,  5000, 2640, 1125}, {192,  20, 1920,  540}, {0,  44, 5, 148,  15, 528,  
+             -2, 1320}}, // 1920x1080i@50(20)
+ 823            
+ 824            {{ 16,  0, 0, (2<<4)|0}, {14850,  6000, 2200, 1125}, {192,  41, 1920, 1080}, {0,  44, 5, 148,  36,  88,  
+             -4,    0}}, // 1920x1080p@60(16)
+ 825            {{ 16,  0, 0, (2<<4)|0}, {14850,  5994, 2200, 1125}, {192,  41, 1920, 1080}, {0,  44, 5, 148,  36,  88,  
+             -4,    0}}, // 1920x1080p@59.94(16)
+ 826            {{ 31,  0, 0, (2<<4)|0}, {14850,  5000, 2640, 1125}, {192,  41, 1920, 1080}, {0,  44, 5, 148,  36, 528,  
+             -4,    0}}, // 1920x1080p@50(31)
+ 827          
+ 828            {{ 34,  0, 0, (2<<4)|0}, {7425,  3000, 2200, 1125}, {192,  41, 1920, 1080}, {0,  44, 5, 148,  36,  88,  4
+             -,    0}}, // 1920x1080p@30(34)
+ 829            {{ 33,  0, 0, (2<<4)|0}, {7425,  2500, 2640, 1125}, {192,  41, 1920, 1080}, {0,  44, 5, 148,  36, 528,  4
+             -,    0}}, // 1920x1080p@25(33)
+ 830            {{ 32,  0, 0, (2<<4)|0}, {7425,  2400, 2750, 1125}, {192,  41, 1920, 1080}, {0,  44, 5, 148,  36, 638,  4
+             -,    0}}, // 1920x1080p@24(32)
+ 831              
+ 832            {{ 16,  0, 0, (2<<4)|0}, {14850,  6000, 2200, 1125}, {192,  41, 1280, 960}, {0,  44, 5, 148,  36,  88,  4
+             -,    0}}, // 1920x1080p@60(16)
+ 833              
+ 834          //  {{  1,  0, 0, (0<<4)|0}, { 2517,  6000,  800,  525}, {144,  35,  640,  480}, {0,  96, 2,  48,  33,  16,
+             - 10,    0}}, // 640x480@60(1)
+ 835          //  {{ 66,  0, 0, (0<<4)|0}, { 3150,  7500,  840,  500}, {184,  19,  640,  480}, {0,  64, 3, 120,  16,  16,
+             -  1,    0}}, // 640x480@75
+ 836          //  {{ 69,  0, 0, (0<<4)|0}, { 4000,  6032, 1056,  628}, {216,  27,  800,  600}, {0, 128, 4,  88,  23,  40,
+             -  1,    0}}, // 800x600@60
+ 837          //  {{ 71,  0, 0, (0<<4)|0}, { 4950,  7500, 1056,  625}, {240,  24,  800,  600}, {0,  80, 3, 160,  21,  16,
+             -  1,    0}}, // 800x600@75
+C51 COMPILER V9.60.7.0   MDINFRMT                                                          12/22/2023 18:00:42 PAGE 16  
+
+ 838          //  {{ 73,  0, 0, (0<<4)|0}, { 6500,  6000, 1344,  806}, {296,  35, 1024,  768}, {0, 136, 6, 160,  29,  24,
+             -  3,    0}}, // 1024x768@60
+ 839          //  {{ 75,  0, 0, (0<<4)|0}, { 7875,  7503, 1312,  800}, {272,  31, 1024,  768}, {0,  96, 3, 176,  28,  16,
+             -  1,    0}}, // 1024x768@75
+ 840          //  {{ 85,  0, 0, (0<<4)|0}, {10800,  6002, 1688, 1066}, {360,  41, 1280, 1024}, {0, 112, 3, 248,  38,  48,
+             -  1,    0}}, // 1280x1024@60
+ 841          //  {{ 86,  0, 0, (0<<4)|0}, {13500,  7503, 1688, 1066}, {392,  41, 1280, 1024}, {0, 144, 3, 248,  38,  16,
+             -  1,    0}}, // 1280x1024@75
+ 842          
+ 843          //  {{ 88,  0, 0, (2<<4)|0}, { 8550,  6002, 1792,  795}, {368,  24, 1360,  768}, {0, 112, 6, 256,  18,  64,
+             -  3,    0}}, // 1360x768@60
+ 844          //  {{ 108,  0, 0, (2<<4)|0}, {8575,  5996, 1792,  798}, {356,  27, 1366,  768}, {0, 143, 3, 213,  24,  70,
+             -  3,    0}}, // 1366x768@60
+ 845          //  {{ 109,  0, 0, (2<<4)|0}, {12175,  5998, 1864,  1089}, {376,  36, 1400,  1050}, {0, 144, 4, 232,  32,  
+             -88,  3,    0}}, // 1400x1050@60
+ 846          //  {{ 78,  0, 0, (0<<4)|0}, {16200,  6000, 2160, 1250}, {496,  49, 1600, 1200}, {0, 192, 3, 304,  46,  64,
+             -  1,    0}}, // 1600x1200@60
+ 847          
+ 848          //  {{108,  0, 0, (2<<4)|0}, {10650,  5989, 1904,  934}, {384,  31, 1440,  900}, {0, 152, 6, 232,  25,  80,
+             -  3,    0}}, // 1440x900@60
+ 849          //  {{109,  0, 0, (2<<4)|0}, {13675,  7498, 1936,  942}, {400,  39, 1440,  900}, {0, 152, 6, 248,  33,  96,
+             -  3,    0}}, // 1440x900@75
+ 850          //  {{110,  0, 0, (2<<4)|0}, {14625,  5995, 2240, 1089}, {456,  36, 1680, 1050}, {0, 176, 6, 280,  30, 104,
+             -  3,    0}}, // 1680x1050@60
+ 851          
+ 852          //  {{111,  0, 0, (2<<4)|0}, {11900,  5988, 1840, 1080}, {112,  27, 1680, 1050}, {0,  32, 6,  80,  21,  48,
+             -  3,    0}}, // 1680x1050@RB
+ 853          //  {{112,  0, 0, (2<<4)|0}, {13850,  5993, 2080, 1111}, {112,  28, 1920, 1080}, {0,  32, 5,  80,  23,  48,
+             -  3,    0}}, // 1920x1080@RB
+ 854          //  {{113,  0, 0, (2<<4)|0}, {15400,  5995, 2080, 1235}, {112,  32, 1920, 1200}, {0,  32, 6,  80,  26,  48,
+             -  3,    0}}, // 1920x1200@RB
+ 855          
+ 856          ////    Video-format (60Hz)
+ 857          ////    id1 id2 sub wide|rep    pixel   freq  Htot  Vtot     x    y   Hact  Vact                 BT656
+ 858          //  {{  8,  9, 1, (1<<4)|1}, { 2700,  6000, 1716,  262}, {238,  18, 1440,  240}, {0, 124, 3, 114,  15,  38,
+             -  4,    0}}, // 8,9(1) 1440 x 240p
+ 859          //  {{  8,  9, 2, (1<<4)|1}, { 2700,  6000, 1716,  263}, {238,  18, 1440,  240}, {0, 124, 3, 114,  15,  38,
+             -  4,    0}}, // 8,9(2) 1440 x 240p
+ 860          //  {{ 10, 11, 0, (1<<4)|1}, { 5400,  6000, 3432,  525}, {476,  18, 2880,  480}, {0, 248, 3, 228,  15,  76,
+             -  4, 1716}}, // 10,11 2880 x 480p
+ 861          //  {{ 12, 13, 1, (1<<4)|1}, { 5400,  6000, 3432,  262}, {476,  18, 2880,  240}, {0, 248, 3, 228,  15,  76,
+             -  4,    0}}, // 12,13(1) 2280 x 240p
+ 862          //  {{ 12, 13, 2, (1<<4)|1}, { 5400,  6000, 3432,  263}, {476,  18, 2880,  240}, {0, 248, 3, 228,  15,  76,
+             -  4,    0}}, // 12,13(2) 2280 x 240p
+ 863          //  {{ 14, 15, 0, (1<<4)|0}, { 5400,  6000, 1716,  525}, {244,  36, 1440,  480}, {0, 124, 6, 120,  30,  32,
+             -  9,    0}}, // 14, 15 1140 x 480p
+ 864          
+ 865          ////    Video-format (50Hz)
+ 866          ////    id1 id2 sub wide|rep    pixel   freq  Htot  Vtot     x    y   Hact  Vact                 BT656
+ 867          //  {{ 23, 24, 1, (1<<4)|1}, { 2700,  5000, 1728,  312}, {264,  22, 1440,  288}, {0, 126, 3, 138,  19,  24,
+             -  2,    0}}, // 23,24(1) 1440 x 288p
+ 868          //  {{ 23, 24, 2, (1<<4)|1}, { 2700,  5000, 1728,  313}, {264,  22, 1440,  288}, {0, 126, 3, 138,  19,  24,
+             -  2,    0}}, // 23,24(2) 1440 x 288p
+ 869          //  {{ 23, 24, 3, (1<<4)|1}, { 2700,  5000, 1728,  314}, {264,  22, 1440,  288}, {0, 126, 3, 138,  19,  24,
+             -  2,    0}}, // 23,24(3) 1440 x 288p
+ 870          //  {{ 25, 26, 0, (1<<4)|1}, { 5400,  5000, 3456,  625}, {528,  22, 2880,  576}, {0, 252, 3, 276,  19,  48,
+             -  2, 1728}}, // 25, 26 2880 x 576p
+ 871          //  {{ 27, 28, 1, (1<<4)|1}, { 5400,  5000, 3456,  312}, {528,  22, 2880,  288}, {0, 252, 3, 276,  19,  48,
+             -  2,    0}}, // 27,28(1) 2880 x 288p
+ 872          //  {{ 27, 28, 2, (1<<4)|1}, { 5400,  5000, 3456,  313}, {528,  22, 2880,  288}, {0, 252, 3, 276,  19,  48,
+             -  3,    0}}, // 27,28(2) 2880 x 288p
+ 873          //  {{ 27, 28, 3, (1<<4)|1}, { 5400,  5000, 3456,  314}, {528,  22, 2880,  288}, {0, 252, 3, 276,  19,  48,
+C51 COMPILER V9.60.7.0   MDINFRMT                                                          12/22/2023 18:00:42 PAGE 17  
+
+             -  4,    0}}, // 27,28(3) 2880 x 288p
+ 874          //  {{ 29, 30, 0, (1<<4)|0}, { 5400,  5000, 1728,  625}, {264,  44, 1440,  576}, {0, 128, 5, 136,  39,  24,
+             -  5,    0}}, // 29,30 1440 x 576p
+ 875          
+ 876          ////    Video-format (etcHz)
+ 877          ////    id1 id2 sub wide|rep    pixel   freq  Htot  Vtot     x    y   Hact  Vact                 BT656
+ 878          //  {{ 32,  0, 0, (2<<4)|0}, { 7417,  2400, 2750, 1125}, {192,  41, 1920, 1080}, {0,  44, 5, 148,  36, 638,
+             -  4,    0}}, // 32(2) 1920 x 1080p
+ 879          //  {{ 33,  0, 0, (2<<4)|0}, { 7425,  2500, 2640, 1125}, {192,  41, 1920, 1080}, {0,  44, 5, 148,  36, 528,
+             -  4,    0}}, // 33(3) 1920 x 1080p
+ 880          //  {{ 34,  0, 0, (2<<4)|0}, { 7417,  3000, 2200, 1125}, {192,  41, 1920, 1080}, {0,  44, 5, 148,  36, 528,
+             -  4,    0}}, // 34(4) 1920 x 1080p
+ 881          //  {{ 35, 36, 0, (1<<4)|0}, {10800,  5994, 3432,  525}, {488,  36, 2880,  480}, {0, 248, 6, 240,  30,  64,
+             - 10,    0}}, // 35, 36 2880 x 480p@59.94/60Hz
+ 882          //  {{ 37, 38, 0, (1<<4)|0}, {10800,  5000, 3456,  625}, {528,  44, 2880,  576}, {0, 256, 5, 272,  40,  48,
+             -  5,    0}}, // 37, 38 2880 x 576p@50Hz
+ 883          //  {{ 39,  0, 0, (2<<4)|0}, { 7200,  5000, 2304, 1250}, {352,  62, 1920, 1080}, {0, 168, 5, 184,  87,  32,
+             - 24,    0}}, // 39 1920 x 1080i@50Hz
+ 884          //  {{ 40,  0, 0, (2<<4)|0}, {14850, 10000, 2640, 1125}, {192,  20, 1920, 1080}, {0,  44, 5, 148,  15, 528,
+             -  2, 1320}}, // 40 1920 x 1080i@100Hz
+ 885          //  {{ 41,  0, 0, (2<<4)|0}, {14850, 10000, 1980,  750}, {260,  25, 1280,  720}, {0,  40, 5, 220,  20, 400,
+             -  5,    0}}, // 41 1280 x 720p@100Hz
+ 886          //  {{ 42, 43, 0, (1<<4)|0}, { 5400, 10000,  864,  144}, {132,  44,  720,  576}, {0,  64, 5,  68,  39,  12,
+             -  5,    0}}, // 42, 43, 720 x 576p@100Hz
+ 887          //  {{ 44, 45, 0, (1<<4)|1}, { 5400, 10000,  864,  625}, {264,  22, 1440,  576}, {0,  63, 3,  69,  19,  12,
+             -  2,  432}}, // 44, 45, 720 x 576i@100Hz, pix repl
+ 888          //  {{ 46,  0, 0, (2<<4)|0}, {14835, 11988, 2200, 1125}, {192,  20, 1920, 1080}, {0,  44, 5, 149,  15,  88,
+             -  2, 1100}}, // 46, 1920 x 1080i@119.88/120Hz
+ 889          //  {{ 47,  0, 0, (2<<4)|0}, {14835, 11988, 1650,  750}, {260,  25, 1280,  720}, {0,  40, 5, 220,  20, 110,
+             -  5, 1100}}, // 47, 1280 x 720p@119.88/120Hz
+ 890          //  {{ 48, 49, 0, (1<<4)|0}, { 5400, 11988,  858,  525}, {122,  36,  720,  480}, {0,  62, 6,  60,  30,  16,
+             - 10,    0}}, // 48, 49 720 x 480p@119.88/120Hz
+ 891          //  {{ 50, 51, 0, (1<<4)|1}, { 5400, 11988,  858,  525}, {119,  18,  720,  480}, {0,  62, 3,  57,  15,  19,
+             -  4,  491}}, // 50, 51 720 x 480i@119.88/120Hz
+ 892          //  {{ 52, 53, 0, (1<<4)|0}, {10800, 20000,  864,  625}, {132,  44,  720,  576}, {0,  64, 5,  68,  39,  12,
+             -  5,    0}}, // 52, 53, 720 x 576p@200Hz
+ 893          //  {{ 54, 55, 0, (1<<4)|1}, {10800, 20000,  864,  625}, {132,  22,  720,  576}, {0,  63, 3,  69,  19,  12,
+             -  2,  432}}, // 54, 55, 1440 x 720i @200Hz, pix repl
+ 894          //  {{ 56, 57, 0, (1<<4)|0}, {10800, 24000,  858,  525}, {122,  36,  720,  480}, {0,  62, 6,  60,  30,  16,
+             -  9,    0}}, // 56, 57, 720 x 480p @239.76/240Hz
+ 895          //  {{ 58, 59, 0, (1<<4)|1}, {10800, 24000,  858,  525}, {119,  18,  720,  480}, {0,  62, 3,  57,  15,  19,
+             -  4,  429}}, // 58, 59, 1440 x 480i @239.76/240Hz, pix repl
+ 896          
+ 897          };
+ 898          #endif  /* #if defined(SYSTEM_USE_MDIN340)||defined(SYSTEM_USE_MDIN380) */
+ 899          
+ 900          // -----------------------------------------------------------------------------
+ 901          // Exported function Prototype
+ 902          // -----------------------------------------------------------------------------
+ 903          /*  FILE_END_HERE */
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   ----    ----
+   CONSTANT SIZE    =   2008    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
